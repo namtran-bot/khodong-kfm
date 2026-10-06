@@ -1,0 +1,3512 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KFM Logistics - Hệ Thống Dashboard & Báo Cáo Kho Đông</title>
+  <link rel="icon" type="image/png" href="logo_seedcom_icon.png">
+  <!-- Tailwind CSS -->
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <!-- SheetJS for Full Excel Processing -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+    body {
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: rgba(241, 245, 249, 0.08);
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #475569;
+      border-radius: 4px;
+    }
+    .pulse-dot {
+      animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(1.1); }
+    }
+
+    @media print {
+      body {
+        background-color: #ffffff !important;
+        color: #0f172a !important;
+      }
+      header, nav, .no-print, #paginationControls, #detailModal {
+        display: none !important;
+      }
+      .print-only {
+        display: block !important;
+      }
+      .bg-slate-900, .bg-slate-800, .bg-slate-800\/80, .bg-slate-800\/90, .bg-slate-800\/70 {
+        background-color: #ffffff !important;
+        border-color: #cbd5e1 !important;
+        color: #0f172a !important;
+        box-shadow: none !important;
+      }
+      .text-white, .text-slate-100, .text-slate-200, .text-slate-300 {
+        color: #0f172a !important;
+      }
+      .text-slate-400 {
+        color: #475569 !important;
+      }
+      table {
+        border-collapse: collapse !important;
+        width: 100% !important;
+      }
+      th, td {
+        border: 1px solid #cbd5e1 !important;
+        padding: 6px 8px !important;
+        color: #0f172a !important;
+        font-size: 10px !important;
+      }
+      thead {
+        background-color: #f1f5f9 !important;
+      }
+    }
+    .print-only {
+      display: none;
+    }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen">
+
+  <!-- Printable Header -->
+  <div class="print-only p-6 border-b-2 border-slate-800 mb-4">
+    <div class="flex justify-between items-start">
+      <div class="flex items-center gap-4">
+        <img src="logo_seedcom_icon.png" alt="Seedcom Logistics" class="h-12 w-12 object-contain" />
+        <div>
+          <h1 class="text-xl font-bold uppercase tracking-wider text-slate-900">BÁO CÁO TỔNG KẾT VẬN HÀNH KHO ĐÔNG (KFM_FROZEN)</h1>
+          <p class="text-xs text-slate-600 mt-0.5" id="printReportSubtitle">Kỳ báo cáo: Tất cả dữ liệu | Ngày xuất: --/--/----</p>
+        </div>
+      </div>
+      <div class="text-right text-xs text-slate-500">
+        <p class="font-bold text-slate-800">SEEDCOM LOGISTICS</p>
+        <p>Hệ thống WMS Kho Đông</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Top Navigation Bar -->
+  <header class="border-b border-slate-800 bg-slate-900/95 backdrop-blur sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap items-center justify-between gap-4">
+      
+      <!-- Brand & Title (Official Seedcom Logistics Logo + KFM Frozen) -->
+      <div class="flex items-center space-x-3 cursor-pointer select-none" onclick="switchMainTab('tab-dashboard')">
+        <!-- Official Logo Image Container -->
+        <div class="w-11 h-11 rounded-xl bg-slate-800/90 border border-slate-700/80 flex items-center justify-center shadow-lg shadow-cyan-500/10 p-1 hover:border-cyan-500/50 transition">
+          <img src="logo_seedcom_icon.png" alt="Seedcom Logistics" class="w-9 h-9 object-contain" />
+        </div>
+
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="font-bold text-base text-white tracking-tight">SEEDCOM LOGISTICS</h1>
+            <span class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">KHO ĐÔNG KFM</span>
+          </div>
+          <p class="text-[11px] text-slate-400">Quản Trị Vận Hành Kingfoodmart (KFM_FROZEN)</p>
+        </div>
+      </div>
+
+      <!-- Main Navigation Tabs -->
+      <nav class="flex items-center gap-1.5 bg-slate-950/80 p-1 rounded-xl border border-slate-800 text-xs font-semibold">
+        <button 
+          id="navBtnDashboard" 
+          onclick="switchMainTab('tab-dashboard')"
+          class="px-3 py-1.5 rounded-lg bg-cyan-600 text-white shadow-sm flex items-center gap-1.5 transition"
+        >
+          <span>📊</span>
+          <span>Dashboard Wave</span>
+        </button>
+
+        <button 
+          id="navBtnTool1" 
+          onclick="switchMainTab('tab-tool1')"
+          class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white flex items-center gap-1.5 transition"
+        >
+          <span>📦</span>
+          <span>1. Đáp Ứng Booking & Vượt Tồn</span>
+        </button>
+
+        <button 
+          id="navBtnTool2" 
+          onclick="switchMainTab('tab-tool2')"
+          class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white flex items-center gap-1.5 transition"
+        >
+          <span>🔍</span>
+          <span>2. Đối Chiếu BK - Pick - Thực Chia</span>
+        </button>
+
+        <button 
+          id="navBtnTool3" 
+          onclick="switchMainTab('tab-tool3')"
+          class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white flex items-center gap-1.5 transition"
+        >
+          <span>📥</span>
+          <span>3. Kiểm Tra Đơn Put</span>
+        </button>
+      </nav>
+
+      <!-- Global Actions -->
+      <div class="flex items-center gap-2 text-xs">
+        <div class="hidden sm:flex items-center gap-2 bg-slate-800/80 px-2.5 py-1.5 rounded-lg border border-slate-700">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 pulse-dot"></span>
+          <span class="text-slate-300 text-[11px]" id="syncStatus">Google Sheets Live</span>
+          <span class="text-slate-500 border-l border-slate-700 pl-1.5 text-[10px]" id="lastUpdated">--:--</span>
+        </div>
+
+        <button onclick="fetchLiveSheet()" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium rounded-lg border border-slate-700 flex items-center gap-1 transition" title="Làm mới dữ liệu từ Google Sheets">
+          <svg id="refreshIcon" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+          </svg>
+          <span class="hidden md:inline">Làm mới</span>
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- Main Workspace -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
+
+    <!-- ========================================================================= -->
+    <!-- TAB 1: MAIN DASHBOARD (DASHBOARD KHO ĐÔNG & GIÁM SÁT WAVE)                -->
+    <!-- ========================================================================= -->
+    <div id="tab-dashboard" class="main-tab-content space-y-6">
+
+      <!-- Active Period Highlight Banner -->
+      <div class="bg-gradient-to-r from-blue-950/70 via-slate-900 to-slate-900 border border-cyan-800/40 rounded-xl p-4 flex flex-wrap items-center justify-between gap-4 shadow-sm">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-lg bg-cyan-500/20 text-cyan-300 flex items-center justify-center font-bold text-lg border border-cyan-500/30">
+            📅
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="text-xs text-slate-400 font-medium">KỲ BÁO CÁO:</span>
+              <span class="text-sm font-bold text-cyan-300 uppercase" id="currentPeriodLabel">TẤT CẢ THỜI GIAN</span>
+            </div>
+            <p class="text-xs text-slate-400 mt-0.5">Dữ liệu được lọc tự động cho KPIs, biểu đồ và bảng tra cứu bên dưới</p>
+          </div>
+        </div>
+
+        <!-- Quick Switcher & Export -->
+        <div class="flex items-center gap-2 text-xs flex-wrap">
+          <button onclick="selectMonthFast('09/2026')" class="px-2.5 py-1 rounded-lg bg-cyan-600/30 hover:bg-cyan-600 text-cyan-200 border border-cyan-500/40 font-semibold transition">Tháng 09/2026</button>
+          <button onclick="selectMonthFast('08/2026')" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 font-medium transition">Tháng 08/2026</button>
+          <button onclick="selectDaysFast(7)" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 font-medium transition">7 ngày qua</button>
+          <button onclick="selectDaysFast(14)" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 font-medium transition">14 ngày qua</button>
+          <button onclick="selectMonthFast('ALL')" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 font-medium transition">Tất cả</button>
+          
+          <button onclick="exportExcelReport()" class="ml-2 px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg flex items-center gap-1 transition shadow-sm">
+            <span>⬇ Xuất Excel (.xlsx)</span>
+          </button>
+          <button onclick="printMonthlyPDF()" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium rounded-lg border border-slate-700 transition">
+            <span>🖨️ In / PDF</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- KPI Summary Cards -->
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
+        <div class="bg-slate-800/80 border border-slate-700/80 rounded-xl p-4 shadow-sm relative overflow-hidden">
+          <div class="text-xs font-medium text-slate-400">Tổng Số Wave</div>
+          <div class="text-2xl font-black text-white mt-1" id="kpiTotalWaves">0</div>
+          <div class="text-[11px] text-cyan-400 mt-1 flex items-center gap-1">
+            <span id="kpiCompletedWaves">0</span> đã xuất kho
+          </div>
+          <div class="absolute -bottom-2 -right-2 text-slate-700/30 text-5xl select-none font-bold">#</div>
+        </div>
+
+        <div class="bg-slate-800/80 border border-slate-700/80 rounded-xl p-4 shadow-sm relative overflow-hidden">
+          <div class="text-xs font-medium text-slate-400">Tổng Lượng Yêu Cầu</div>
+          <div class="text-2xl font-black text-blue-400 mt-1" id="kpiTotalDemand">0</div>
+          <div class="text-[11px] text-slate-400 mt-1">Sản phẩm đơn đặt</div>
+          <div class="absolute -bottom-2 -right-2 text-blue-900/20 text-5xl select-none font-bold">📦</div>
+        </div>
+
+        <div class="bg-slate-800/80 border border-slate-700/80 rounded-xl p-4 shadow-sm relative overflow-hidden">
+          <div class="text-xs font-medium text-slate-400">Lượng Allocate</div>
+          <div class="text-2xl font-black text-indigo-400 mt-1" id="kpiTotalAllocated">0</div>
+          <div class="text-[11px] text-slate-400 mt-1">Đã phân bổ vị trí</div>
+          <div class="absolute -bottom-2 -right-2 text-indigo-900/20 text-5xl select-none font-bold">🎯</div>
+        </div>
+
+        <div class="bg-slate-800/80 border border-slate-700/80 rounded-xl p-4 shadow-sm relative overflow-hidden">
+          <div class="text-xs font-medium text-slate-400">Lượng Thực Pick</div>
+          <div class="text-2xl font-black text-emerald-400 mt-1" id="kpiTotalPicked">0</div>
+          <div class="text-[11px] text-emerald-400 mt-1" id="kpiPickRatio">0% đáp ứng</div>
+          <div class="absolute -bottom-2 -right-2 text-emerald-900/20 text-5xl select-none font-bold">✅</div>
+        </div>
+
+        <div class="bg-slate-800/80 border border-slate-700/80 rounded-xl p-4 shadow-sm relative overflow-hidden">
+          <div class="text-xs font-medium text-slate-400">Lượng Rớt / Hụt</div>
+          <div class="text-2xl font-black text-rose-400 mt-1" id="kpiTotalShort">0</div>
+          <div class="text-[11px] text-rose-400 mt-1 flex items-center gap-1">
+            <span id="kpiWavesWithShort">0</span> Wave bị thiếu SKU
+          </div>
+          <div class="absolute -bottom-2 -right-2 text-rose-900/20 text-5xl select-none font-bold">⚠️</div>
+        </div>
+
+        <div class="bg-slate-800/80 border border-slate-700/80 rounded-xl p-4 shadow-sm relative overflow-hidden">
+          <div class="text-xs font-medium text-slate-400">Tỷ Lệ Hoàn Thành TB</div>
+          <div class="text-2xl font-black text-amber-400 mt-1" id="kpiAvgRate">0%</div>
+          <div class="text-[11px] text-amber-300 mt-1" id="kpiPerfectRate">0% đạt 100%</div>
+          <div class="absolute -bottom-2 -right-2 text-amber-900/20 text-5xl select-none font-bold">📊</div>
+        </div>
+      </div>
+
+      <!-- Visual Charts Section (3 Clear View Options) -->
+      <div class="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-5 shadow-lg space-y-4 no-print">
+        
+        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-700/70 pb-3.5">
+          <div>
+            <div class="flex items-center gap-2.5">
+              <span class="text-lg">📊</span>
+              <h2 class="text-base font-bold text-white tracking-tight" id="chartViewTitle">
+                So Sánh Sản Lượng: Yêu Cầu vs Thực Tế Pick Theo Ngày
+              </h2>
+            </div>
+            <p class="text-xs text-slate-400 mt-0.5" id="chartViewDescription">
+              Biểu đồ so sánh trực quan giữa số lượng đơn đặt và số lượng thực tế soạn được (kèm lượng rớt hàng nếu có)
+            </p>
+          </div>
+
+          <div class="flex items-center gap-2 flex-wrap">
+            <div class="bg-slate-900/90 p-1 rounded-xl border border-slate-700 flex text-xs font-medium">
+              <button id="tabVolume" onclick="switchVisualMode('volume')" class="px-3 py-1.5 rounded-lg bg-cyan-600 text-white font-semibold transition flex items-center gap-1.5 shadow-sm">
+                <span>📊 Cột Sản Lượng</span>
+              </button>
+              <button id="tabRate" onclick="switchVisualMode('rate')" class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition flex items-center gap-1.5">
+                <span>📈 Xu Hướng Tỷ Lệ %</span>
+              </button>
+              <button id="tabCards" onclick="switchVisualMode('cards')" class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition flex items-center gap-1.5">
+                <span>🗂️ Thẻ Từng Ngày</span>
+              </button>
+            </div>
+
+            <select id="chartTimeSpan" onchange="renderVisualSection()" class="py-1.5 px-3 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-300 focus:outline-none">
+              <option value="ALL">Toàn bộ kỳ</option>
+              <option value="10">10 ngày gần nhất</option>
+              <option value="5">5 ngày gần nhất</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="chartLegend" class="flex flex-wrap items-center justify-between gap-2 text-xs py-1 text-slate-300"></div>
+
+        <div id="chartSvgWrapper" class="relative w-full h-80 overflow-x-auto custom-scrollbar bg-slate-900/50 rounded-xl p-2 border border-slate-800/60">
+          <svg id="mainInteractiveSvg" class="w-full h-full min-w-[760px]" preserveAspectRatio="none"></svg>
+        </div>
+
+        <div id="dailyCardsWrapper" class="hidden">
+          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3.5 max-h-96 overflow-y-auto custom-scrollbar pr-1" id="dailyCardsContainer"></div>
+        </div>
+
+        <div class="flex items-center justify-between text-[11px] text-slate-400 pt-1">
+          <span class="flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
+            Rê chuột vào cột hoặc bấm vào thẻ để xem chi tiết phiếu xuất và hàng hóa.
+          </span>
+          <span id="chartItemsCount" class="font-mono text-cyan-300 font-semibold">0 Ngày đi hàng</span>
+        </div>
+      </div>
+
+      <!-- Filter Toolbar: Month vs Date Range Switcher -->
+      <div class="bg-slate-800/90 border border-slate-700 rounded-xl p-4 shadow-sm no-print space-y-3.5">
+        
+        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-700/60 pb-3">
+          <div class="flex items-center gap-2 text-xs font-semibold text-slate-300">
+            <span>⚙️ CHẾ ĐỘ LỌC THỜI GIAN:</span>
+            <div class="bg-slate-900 p-0.5 rounded-lg border border-slate-700 flex text-xs">
+              <button id="btnModeMonth" onclick="switchFilterMode('month')" class="px-3 py-1 rounded-md bg-cyan-600 text-white font-bold transition">
+                🗓️ Lọc Theo Tháng
+              </button>
+              <button id="btnModeRange" onclick="switchFilterMode('range')" class="px-3 py-1 rounded-md text-slate-400 hover:text-white transition">
+                📅 Chọn Khoảng Ngày (Từ - Đến)
+              </button>
+            </div>
+          </div>
+
+          <div class="text-xs text-slate-400">
+            Tìm kiếm & phân loại nhanh toàn bộ các đợt sóng xuất kho
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-end">
+          
+          <div id="filterMonthContainer" class="lg:col-span-3">
+            <label class="block text-[11px] font-semibold text-slate-400 mb-1">CHỌN THÁNG:</label>
+            <select 
+              id="filterMonth" 
+              onchange="handleFilterChange()"
+              class="w-full py-2 px-3 bg-slate-900 border border-cyan-500/60 rounded-lg text-xs font-bold text-cyan-300 focus:outline-none focus:ring-1 focus:ring-cyan-500 transition"
+            >
+              <option value="ALL">🗓️ Toàn bộ các tháng</option>
+            </select>
+          </div>
+
+          <div id="filterRangeContainer" class="lg:col-span-4 hidden">
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-400 mb-1">TỪ NGÀY:</label>
+                <input 
+                  type="date" 
+                  id="filterStartDate" 
+                  onchange="handleFilterChange()"
+                  class="w-full py-2 px-2.5 bg-slate-900 border border-cyan-500/60 rounded-lg text-xs font-bold text-cyan-300 focus:outline-none focus:ring-1 focus:ring-cyan-500 transition"
+                />
+              </div>
+              <div>
+                <label class="block text-[11px] font-semibold text-slate-400 mb-1">ĐẾN NGÀY:</label>
+                <input 
+                  type="date" 
+                  id="filterEndDate" 
+                  onchange="handleFilterChange()"
+                  class="w-full py-2 px-2.5 bg-slate-900 border border-cyan-500/60 rounded-lg text-xs font-bold text-cyan-300 focus:outline-none focus:ring-1 focus:ring-cyan-500 transition"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div id="searchContainer" class="lg:col-span-3">
+            <label class="block text-[11px] font-semibold text-slate-400 mb-1">TÌM KIẾM NHANH:</label>
+            <div class="relative">
+              <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">🔍</span>
+              <input 
+                type="text" 
+                id="searchInput" 
+                placeholder="Mã PT, Tên Wave, loại đơn..." 
+                oninput="handleFilterChange()"
+                class="w-full pl-9 pr-4 py-2 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-100 placeholder-slate-400 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition"
+              />
+            </div>
+          </div>
+
+          <div class="lg:col-span-2">
+            <label class="block text-[11px] font-semibold text-slate-400 mb-1">LOẠI ĐƠN HÀNG:</label>
+            <select 
+              id="filterType" 
+              onchange="handleFilterChange()"
+              class="w-full py-2 px-3 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-cyan-500 transition"
+            >
+              <option value="ALL">Mọi loại đơn</option>
+              <option value="DAILY">Hàng Daily</option>
+              <option value="NSO">Hàng NSO (Mở mới)</option>
+              <option value="BS">Hàng Bổ Sung (BS)</option>
+              <option value="CHAM">Châm hàng</option>
+            </select>
+          </div>
+
+          <div class="lg:col-span-2">
+            <label class="block text-[11px] font-semibold text-slate-400 mb-1">TỶ LỆ ĐÁP ỨNG:</label>
+            <select 
+              id="filterRate" 
+              onchange="handleFilterChange()"
+              class="w-full py-2 px-3 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-cyan-500 transition"
+            >
+              <option value="ALL">Mọi mức tỷ lệ</option>
+              <option value="100">Đạt 100% (Hoàn hảo)</option>
+              <option value="95">Từ 95% - 99.9%</option>
+              <option value="UNDER95">Dưới 95%</option>
+              <option value="SHORT">Chỉ đơn có Rớt Hàng / Short</option>
+            </select>
+          </div>
+
+          <div class="lg:col-span-2">
+            <label class="block text-[11px] font-semibold text-slate-400 mb-1">ĐỐI CHIẾU TỒN KHO:</label>
+            <select 
+              id="filterReconStatus" 
+              onchange="handleFilterChange()"
+              class="w-full py-2 px-3 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-cyan-500 transition"
+            >
+              <option value="ALL">Tất cả tình trạng</option>
+              <option value="OVER">⚠️ Có Booking Vượt Tồn</option>
+              <option value="OK">✅ 100% Đủ Tồn Kho</option>
+              <option value="NONE">Chưa nạp đối chiếu</option>
+            </select>
+          </div>
+
+        </div>
+
+        <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-700/60 text-xs">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="text-slate-400 font-medium">Lọc nhanh:</span>
+            <button onclick="setFilterQuick('NSO')" class="px-2.5 py-1 rounded-full bg-slate-700 hover:bg-cyan-900/60 text-slate-300 hover:text-cyan-200 border border-slate-600 transition">Đơn NSO</button>
+            <button onclick="setFilterQuick('DAILY')" class="px-2.5 py-1 rounded-full bg-slate-700 hover:bg-cyan-900/60 text-slate-300 hover:text-cyan-200 border border-slate-600 transition">Đơn Daily</button>
+            <button onclick="setFilterQuick('SHORT')" class="px-2.5 py-1 rounded-full bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-800/50 transition">⚠️ Đơn Có Rớt Hàng</button>
+            <button onclick="setFilterQuick('OVER')" class="px-2.5 py-1 rounded-full bg-amber-950/40 hover:bg-amber-900/60 text-amber-300 border border-amber-800/50 transition">📦 Vượt Tồn Kho</button>
+            <button onclick="setFilterQuick('100')" class="px-2.5 py-1 rounded-full bg-emerald-950/40 hover:bg-emerald-900/60 text-emerald-300 border border-emerald-800/50 transition">⭐ Tỷ lệ 100%</button>
+            <button onclick="resetFilters()" class="px-2.5 py-1 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700 transition">↺ Đặt lại lọc</button>
+          </div>
+          <span class="text-slate-400 font-mono text-xs" id="resultCount">Hiển thị 0 / 0 đơn</span>
+        </div>
+      </div>
+
+      <!-- Data Table -->
+      <div class="bg-slate-800/90 border border-slate-700 rounded-xl shadow-sm overflow-hidden">
+        <div class="p-4 border-b border-slate-700 flex flex-wrap items-center justify-between gap-2">
+          <h2 class="text-sm font-bold text-white flex items-center gap-2">
+            <span>📋 Chi Tiết Các Đợt Sóng Xuất Kho Đông</span>
+            <span class="text-xs font-normal text-cyan-300" id="tablePeriodSubtitle"></span>
+          </h2>
+          <div class="text-xs text-slate-400 no-print flex items-center gap-3">
+            <span>Click vào tiêu đề cột để sắp xếp</span>
+            <span>•</span>
+            <span>Click dòng bất kỳ để xem chi tiết mã vượt tồn</span>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto custom-scrollbar">
+          <table class="w-full text-left text-xs whitespace-nowrap">
+            <thead class="bg-slate-900/80 text-slate-300 border-b border-slate-700 select-none">
+              <tr>
+                <th onclick="sortTable('stt')" class="py-3 px-3 cursor-pointer hover:text-white">STT ↕</th>
+                <th onclick="sortTable('wave')" class="py-3 px-3 cursor-pointer hover:text-white">Tên Wave ↕</th>
+                <th onclick="sortTable('pt')" class="py-3 px-3 cursor-pointer hover:text-white">Số PT ↕</th>
+                <th onclick="sortTable('type')" class="py-3 px-3 cursor-pointer hover:text-white">Loại Đơn ↕</th>
+                <th onclick="sortTable('date')" class="py-3 px-3 cursor-pointer hover:text-white">Ngày Đi Hàng ↕</th>
+                <th onclick="sortTable('status')" class="py-3 px-3 cursor-pointer hover:text-white">Trạng Thái ↕</th>
+                <th onclick="sortTable('shortSku')" class="py-3 px-3 cursor-pointer hover:text-white">Short SKU ↕</th>
+                <th onclick="sortTable('skuPerOrder')" class="py-3 px-3 text-right cursor-pointer hover:text-cyan-300" title="Số lượng SKU trên 1 đơn hàng">SKU / Đơn ↕</th>
+                <th onclick="sortTable('total')" class="py-3 px-3 text-right cursor-pointer hover:text-white">Tổng Lượng ↕</th>
+                <th onclick="sortTable('allocated')" class="py-3 px-3 text-right cursor-pointer hover:text-white">Allocate ↕</th>
+                <th onclick="sortTable('picked')" class="py-3 px-3 text-right cursor-pointer hover:text-white">Lượng Pick ↕</th>
+                <th onclick="sortTable('dropped')" class="py-3 px-3 text-right cursor-pointer hover:text-white" title="Số lượng Unit rớt đơn hàng">Unit Rớt Đơn ↕</th>
+                <th onclick="sortTable('rate')" class="py-3 px-4 text-center cursor-pointer hover:text-white">Tỷ Lệ Đáp Ứng ↕</th>
+                <th onclick="sortTable('recon')" class="py-3 px-3 text-center cursor-pointer hover:text-amber-300" title="Tình trạng Booking vượt tồn kho từ file đối chiếu">Tồn Kho & Vượt Tồn ↕</th>
+              </tr>
+            </thead>
+            <tbody id="ordersTableBody" class="divide-y divide-slate-700/60 text-slate-200"></tbody>
+          </table>
+        </div>
+
+        <div class="print-only p-8 mt-6">
+          <div class="grid grid-cols-3 gap-8 text-center text-xs text-slate-800">
+            <div>
+              <p class="font-semibold">NGƯỜI LẬP BÁO CÁO</p>
+              <p class="text-[10px] text-slate-500 italic mt-0.5">(Ký và ghi rõ họ tên)</p>
+              <div class="h-20"></div>
+            </div>
+            <div>
+              <p class="font-semibold">THỦ KHO ĐÔNG</p>
+              <p class="text-[10px] text-slate-500 italic mt-0.5">(Ký và ghi rõ họ tên)</p>
+              <div class="h-20"></div>
+            </div>
+            <div>
+              <p class="font-semibold">QUẢN LÝ VẬN HÀNH WMS</p>
+              <p class="text-[10px] text-slate-500 italic mt-0.5">(Ký và xác nhận)</p>
+              <div class="h-20"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- TAB 2: TOOL 1 - TỈ LỆ ĐÁP ỨNG BOOKING & VƯỢT TỒN KHO                     -->
+    <!-- ========================================================================= -->
+    <div id="tab-tool1" class="main-tab-content hidden space-y-5">
+      
+      <div class="bg-slate-800/90 border border-slate-700 rounded-xl p-5 shadow-sm">
+        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-700/80 pb-3 mb-4">
+          <div class="flex items-center gap-2.5">
+            <span class="text-2xl">📦</span>
+            <div>
+              <h2 class="text-base font-bold text-white">Báo Cáo Tỉ Lệ Đáp Ứng Booking & Lọc Vượt Tồn Kho</h2>
+              <p class="text-xs text-slate-400">Thả 3 file: <b>Booking</b> · <b>Pick Tổng (Allocate)</b> · <b>KFM Stock (Tồn kho)</b> — Tùy chọn: file <b>trọng lượng N.W</b> để tính Kg</p>
+            </div>
+          </div>
+          
+          <!-- Fast Wave Target Selector -->
+          <div class="flex flex-col sm:flex-row items-start sm:items-center gap-2 bg-slate-900/90 p-2.5 rounded-lg border border-slate-700">
+            <label class="text-xs font-bold text-amber-300 whitespace-nowrap">Gán vào Wave:</label>
+            <select id="t1TargetWaveSelect" class="py-1 px-2.5 bg-slate-800 border border-slate-600 rounded text-xs text-white font-semibold focus:outline-none focus:border-amber-500 max-w-xs truncate">
+              <!-- Populated dynamically -->
+            </select>
+          </div>
+        </div>
+
+        <!-- Auto-Detect Notice Banner -->
+        <div id="t1AutoDetectBadge" class="mb-3 p-2.5 bg-cyan-950/70 border border-cyan-700/80 rounded-lg text-xs text-cyan-300 flex items-center justify-between hidden">
+          <div class="flex items-center gap-2">
+            <span>✨</span>
+            <span id="t1AutoDetectText" class="font-semibold">Tự động nhận diện Wave: ...</span>
+          </div>
+          <span class="text-[11px] text-slate-400">(Tự động chọn hoặc bạn có thể đổi Wave khác)</span>
+        </div>
+
+        <!-- Dropzone 1 -->
+        <div class="border-2 border-dashed border-slate-600 hover:border-amber-500 rounded-xl bg-slate-900/60 p-7 text-center cursor-pointer transition" id="t1-dropzone">
+          <input type="file" id="t1-fileInput" multiple accept=".xlsx,.xls" class="hidden" />
+          <div class="text-3xl mb-2">📂</div>
+          <div class="text-sm font-semibold text-slate-200">
+            Kéo thả các file Excel vào đây, hoặc <button type="button" id="t1-browseBtn" class="text-amber-400 underline hover:text-amber-300">chọn file</button>
+          </div>
+          <div class="text-xs text-slate-400 mt-1">Cần đủ 3 file: Booking (đơn cần chuyển) · Pick Tổng · KFM Stock (Tồn kho)</div>
+        </div>
+
+        <div id="t1-filesList" class="mt-4 space-y-2"></div>
+        <div id="t1-missingHint" class="text-xs text-rose-400 font-medium mt-2 hidden"></div>
+        <div id="t1-errorBox" class="p-3 bg-rose-950/50 border border-rose-800 text-rose-300 rounded-xl text-xs mt-3 hidden"></div>
+
+        <div class="flex flex-wrap items-center justify-between gap-3 mt-5 pt-3 border-t border-slate-700">
+          <div class="flex items-center gap-2">
+            <label class="text-xs text-slate-400 font-medium">Ngày report:
+              <input type="date" id="t1-reportDate" class="ml-1 py-1 px-2 bg-slate-900 border border-slate-600 rounded text-xs text-white" />
+            </label>
+          </div>
+          <div class="flex items-center gap-2">
+            <button id="t1-resetBtn" class="px-3.5 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-xs font-medium transition">Làm lại</button>
+            <button id="t1-generateBtn" disabled class="px-5 py-1.5 bg-amber-600 hover:bg-amber-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-xs font-bold transition shadow-sm">
+              ⚡ Tạo Report & Gán Vào Wave
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div id="t1-results" class="space-y-4"></div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- TAB 3: TOOL 2 - ĐỐI CHIẾU BOOKING - PICK TỔNG - THỰC CHIA                 -->
+    <!-- ========================================================================= -->
+    <div id="tab-tool2" class="main-tab-content hidden space-y-5">
+      
+      <div class="bg-slate-800/90 border border-slate-700 rounded-xl p-5 shadow-sm">
+        <div class="flex items-center gap-2.5 border-b border-slate-700/80 pb-3 mb-4">
+          <span class="text-2xl">🔍</span>
+          <div>
+            <h2 class="text-base font-bold text-white">Đối Chiếu Booking – Pick Tổng – Thực Chia Quá Cảnh</h2>
+            <p class="text-xs text-slate-400">Cần 3 file: <b>Booking</b> (yêu cầu ban đầu) · <b>Pick Tổng</b> (SL Pick) · <b>Chi tiết chia quá cảnh</b> (SL thực chia)</p>
+          </div>
+        </div>
+
+        <!-- Dropzone 2 -->
+        <div class="border-2 border-dashed border-slate-600 hover:border-cyan-500 rounded-xl bg-slate-900/60 p-7 text-center cursor-pointer transition" id="t2-dropzone">
+          <input type="file" id="t2-fileInput" multiple accept=".xlsx,.xls" class="hidden" />
+          <div class="text-3xl mb-2">📂</div>
+          <div class="text-sm font-semibold text-slate-200">
+            Kéo thả các file Excel vào đây, hoặc <button type="button" id="t2-browseBtn" class="text-cyan-400 underline hover:text-cyan-300">chọn file</button>
+          </div>
+          <div class="text-xs text-slate-400 mt-1">Cần 3 file: Booking · Pick Tổng · Chi tiết chia quá cảnh</div>
+        </div>
+
+        <div id="t2-filesList" class="mt-4 space-y-2"></div>
+        <div id="t2-missingHint" class="text-xs text-rose-400 font-medium mt-2 hidden"></div>
+        <div id="t2-errorBox" class="p-3 bg-rose-950/50 border border-rose-800 text-rose-300 rounded-xl text-xs mt-3 hidden"></div>
+
+        <div class="flex items-center justify-end gap-2 mt-5 pt-3 border-t border-slate-700">
+          <button id="t2-resetBtn" class="px-3.5 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-xs font-medium transition">Làm lại</button>
+          <button id="t2-generateBtn" disabled class="px-5 py-1.5 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-xs font-bold transition shadow-sm">
+            Tạo Báo Cáo Đối Chiếu
+          </button>
+        </div>
+      </div>
+
+      <div id="t2-results" class="space-y-4"></div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- TAB 4: TOOL 3 - KIỂM TRA ĐƠN PUT KỆ                                       -->
+    <!-- ========================================================================= -->
+    <div id="tab-tool3" class="main-tab-content hidden space-y-5">
+      
+      <div class="bg-slate-800/90 border border-slate-700 rounded-xl p-5 shadow-sm">
+        <div class="flex items-center gap-2.5 border-b border-slate-700/80 pb-3 mb-4">
+          <span class="text-2xl">📥</span>
+          <div>
+            <h2 class="text-base font-bold text-white">Kiểm Tra Đơn Put Kệ Kho Đông</h2>
+            <p class="text-xs text-slate-400">Cần 2 file: <b>Master Data</b> (mã hàng + loại hàng + vị trí theo khu) · <b>File Tồn Kho</b> cần kiểm tra (Location, Barcode, Số lượng)</p>
+          </div>
+        </div>
+
+        <!-- Dropzone 3 -->
+        <div class="border-2 border-dashed border-slate-600 hover:border-emerald-500 rounded-xl bg-slate-900/60 p-7 text-center cursor-pointer transition" id="t3-dropzone">
+          <input type="file" id="t3-fileInput" multiple accept=".xlsx,.xls" class="hidden" />
+          <div class="text-3xl mb-2">📂</div>
+          <div class="text-sm font-semibold text-slate-200">
+            Kéo thả các file Excel vào đây, hoặc <button type="button" id="t3-browseBtn" class="text-emerald-400 underline hover:text-emerald-300">chọn file</button>
+          </div>
+          <div class="text-xs text-slate-400 mt-1">Cần 2 file: Master Data + File tồn kho</div>
+        </div>
+
+        <div id="t3-filesList" class="mt-4 space-y-2"></div>
+        <div id="t3-missingHint" class="text-xs text-rose-400 font-medium mt-2 hidden"></div>
+        <div id="t3-errorBox" class="p-3 bg-rose-950/50 border border-rose-800 text-rose-300 rounded-xl text-xs mt-3 hidden"></div>
+
+        <div class="flex items-center justify-end gap-2 mt-5 pt-3 border-t border-slate-700">
+          <button id="t3-resetBtn" class="px-3.5 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-xs font-medium transition">Làm lại</button>
+          <button id="t3-generateBtn" disabled class="px-5 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-xs font-bold transition shadow-sm">
+            Kiểm Tra Đơn Put
+          </button>
+        </div>
+      </div>
+
+      <div id="t3-results" class="space-y-4"></div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- POPUP MODAL: WAVE DETAIL (WITH OVER-STOCK TABLE & RECON SECTION)          -->
+    <!-- ========================================================================= -->
+    <div id="detailModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden no-print">
+      <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto custom-scrollbar">
+        <div class="flex items-center justify-between border-b border-slate-700 pb-3">
+          <div>
+            <span class="text-xs font-bold text-cyan-400 uppercase tracking-wider" id="modalPt">PT0000000</span>
+            <h3 class="text-base font-bold text-white mt-0.5" id="modalWaveName">Wave Name</h3>
+          </div>
+          <button onclick="closeModal()" class="w-8 h-8 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 flex items-center justify-center transition">✕</button>
+        </div>
+
+        <!-- Grid 1: Basic Wave Metrics -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+          <div class="bg-slate-900/60 p-3 rounded-lg border border-slate-700/50">
+            <span class="text-slate-400 block mb-1">Ngày đi hàng</span>
+            <span class="text-white font-semibold text-sm" id="modalDate">-</span>
+          </div>
+          <div class="bg-slate-900/60 p-3 rounded-lg border border-slate-700/50">
+            <span class="text-slate-400 block mb-1">Trạng thái</span>
+            <span class="text-emerald-400 font-semibold text-sm" id="modalStatus">-</span>
+          </div>
+          <div class="bg-slate-900/60 p-3 rounded-lg border border-slate-700/50">
+            <span class="text-slate-400 block mb-1">Tổng Lượng Y/C</span>
+            <span class="text-white font-semibold text-sm" id="modalTotal">-</span>
+          </div>
+          <div class="bg-slate-900/60 p-3 rounded-lg border border-slate-700/50">
+            <span class="text-slate-400 block mb-1">Lượng Thực Pick</span>
+            <span class="text-emerald-400 font-semibold text-sm" id="modalPicked">-</span>
+          </div>
+          <div class="bg-slate-900/60 p-3 rounded-lg border border-slate-700/50">
+            <span class="text-slate-400 block mb-1">Số SKU / Đơn</span>
+            <span class="text-cyan-300 font-semibold text-sm" id="modalSkuPerOrder">-</span>
+          </div>
+          <div class="bg-slate-900/60 p-3 rounded-lg border border-slate-700/50">
+            <span class="text-slate-400 block mb-1">Số Unit Rớt Đơn</span>
+            <span class="text-rose-400 font-semibold text-sm" id="modalDropped">-</span>
+          </div>
+          <div class="bg-slate-900/60 p-3 rounded-lg border border-slate-700/50">
+            <span class="text-slate-400 block mb-1">Tỷ Lệ Hoàn Thành</span>
+            <span class="text-amber-400 font-bold text-sm" id="modalRate">-</span>
+          </div>
+          <div class="bg-slate-900/60 p-3 rounded-lg border border-slate-700/50">
+            <span class="text-slate-400 block mb-1">Short SKU Báo Cáo</span>
+            <span class="text-rose-300 font-semibold text-sm" id="modalShortSku">-</span>
+          </div>
+        </div>
+
+        <div class="bg-slate-900/60 p-3 rounded-lg border border-slate-700/50 text-xs">
+          <span class="text-slate-400 block mb-1">Ghi Chú Loại Đơn:</span>
+          <p class="text-slate-200 font-medium" id="modalType">-</p>
+        </div>
+
+        <!-- Section 2: Reconcile & Booking vs Stock Detail -->
+        <div class="border border-slate-700 rounded-xl p-4 bg-slate-900/80 space-y-3">
+          <div class="flex items-center justify-between">
+            <h4 class="text-xs font-bold text-amber-300 flex items-center gap-1.5 uppercase tracking-wide">
+              <span>🔍</span>
+              <span>Tình Trạng Đối Chiếu Booking & Tồn Kho Thực Tế</span>
+            </h4>
+            <div id="modalReconBadge"></div>
+          </div>
+
+          <div id="modalReconContent"></div>
+        </div>
+
+        <div class="pt-2 flex items-center justify-between">
+          <button onclick="goToTool1WithWave()" class="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition shadow-sm">
+            <span>⚡ Nạp / Cập nhật file đối chiếu cho Wave này</span>
+          </button>
+          <button onclick="closeModal()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-xs font-semibold">Đóng</button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSWoaN7hKcFHHHghT0R2CdGUk3LtUgxB_6sAKBhghHJs17xO2NzuFiZ8zOLeBUc3YKsbGkLkRgq4VF0/pub?output=csv';
+
+    let rawOrders = [];
+    let filteredOrders = [];
+    let sortField = 'date';
+    let sortAsc = true;
+    let autoRefreshTimer = null;
+    let availableMonths = [];
+    let visualMode = 'volume'; // 'volume' | 'rate' | 'cards'
+    let filterTimeMode = 'month'; // 'month' | 'range'
+    let currentSelectedWaveObj = null;
+
+    const INITIAL_CSV_DATA = `STT,TÊN WAVE ,SỐ PT,LOẠI ĐƠN ,NGÀY ĐI HÀNG ,TRẠNG THÁI ,SHORT,TỔNG LƯỢNG ,LƯỢNG ALLOCATE ĐƯỢC ,LƯỢNG PICK ,SỐ LƯỢNG UNIT RỚT ĐƠN HÀNG ,SỐ LƯỢNG SKU /ĐƠN HÀNG,TỶ LỆ 
+1,KFM_FROZEN_NSO_270826,PT1714502,hàng đông NSO đợt 1 đi hàng 27.08,27/08/2026,HOÀN THÀNH ,6 SKU ,732,693,732,39,79,"100,0%"
+2,KFM_FROZEN_260826,PT1719215,Hàng ĐÔNG đi hàng ngày 26.08,26/06/2026,HOÀN THÀNH ,11 SKU ,14864,14530,12669,334,123,"85,2%"
+3,KFM_FROZEN_NS0_D1_270826,PT1723591,hàng đông NSO đợt 2 và đông daily đi hàng 27.08,27/08/2026,HOÀN THÀNH ,20 SKU ,19316,18231,14351,1085,124,"74,3%"
+4, Wave - KFM_FROZEN_280626,PT1728736,hàng ĐÔNG đi hàng ngày 28.08,28/8/2026,HOÀN THÀNH ,27 SKU ,15150,13424,12208,1726,129,"80,6%"
+5,KFM_FROZEN_290826,PT1733543,hàng ĐÔNG đi hàng 29.08,29/08/2026,HOÀN THÀNH ,27 SKU ,15061,13867,12822,1194,124,"85,1%"
+6,KFM_FROZEN_CNSO_290826,PT1734211,Booking châm hàng ĐÔNG NSO A232 đi hàng ngày 29.08,29/08/2026,HOÀN THÀNH ,6 SKU ,317,275,233,42,32,"73,5%"
+7, KFM_FROZEN_BSNSO_290826,PT1734396,Booking bổ sung NSO A232 hàng ĐÔNG mã short tồn đi hàng 29.08,29/08/2026,HOÀN THÀNH ,0 SKU ,24,24,24,0,5,"100,0%"
+8,KFM_FROZEN_300826,PT1738035,Booking hàng ĐÔNG đi hàng ngày 30.08,30/08/2026,HOÀN THÀNH ,23 SKU ,12395,11427,10974,968,124,"88,5%"
+9,KFM_FROZEN_310826,PT1741603,hàng ĐÔNG đi hàng ngày 31.08,31/08/2026,HOÀN THÀNH ,24SKU ,8685,7597,6500,1088,118,"74,8%"
+10,KFM_FROZEN_BS_310826,PT1742468,bổ sung hàng Đông về hàng ngày 31.08,31/08/2026,HOÀN THÀNH ,26 SKU,1694,1328,1200,128,112,"70,8%"
+11,KFM_FROZEN_BS_A232_310826,PT1742671,bổ sung thêm 1 ST mà chia thiếu của Anh Thiện,31/08/2026,HOÀN THÀNH ,8 SKU,246,209,205,4,22,"83,3%"
+12,KFM_FROZEN_NSO_040926,PT1749839,hàng ĐÔNG NSO đợt 1 đi hàng ngày 04.09,04/09/2026,HOÀN THÀNH ,3sku,784,760,760,0,58,"96,9%"
+13,KFM_FROZEN_020926,PT1749853,DAILY 02.09.2026,02/09/2026,HOÀN THÀNH ,3 SKU,12988,12453,12453,0,120,"95,9%"
+14,KFM_FROZEN_030926,PT1754784,DAILY 03.09.2026,03/09/2026,HOÀN THÀNH ,0 SKU,14048,14048,14048,0,119,"100,0%"
+15,KFM_FROZEN_040926,PT1759106,DAILY + NSO BS 04.09.26,04/09/2026,HOÀN THÀNH ,0 SKU,11915,11915,11914,1,123,"100,0%"
+16,KFM_FROZEN_050926,PT1764778,booking hàng ĐÔNG đi hàng 05.09,05/09/2026,HOÀN THÀNH ,0 SKU ,13778,13778,13778,0,121,"100,0%"
+17,KFM_FROZEN_060926,PT1769197,booking hàng ĐÔNG đi hàng 06.09,06/09/2026,HOÀN THÀNH ,4 SKU,11252,11146,11146,0,118,"99,1%"
+18,KFM_FROZEN_CNSO_060926,PT1769763,châm NSO,06/09/2026,HOÀN THÀNH ,0 SKU ,146,146,146,0,12,"100,0%"
+19,KFM_FROZEN_070926,PT1773623,booking hàng ĐÔNG đi hàng 07.09,07/09/2026,HOÀN THÀNH ,7 SKU,10270,10216,10039,177,109,"97,8%"
+20,KFM_FROZEN_080926,PT1778209,booking hàng ĐÔNG đi hàng ngày 08.09,08/09/2026,HOÀN THÀNH ,0 SKU ,15372,15222,15202,20,115,"98,9%"
+21,KFM_FROZEN_BS_080926,PT1779129,booking hàng ĐÔNG (mã sắp ngưng) đi hàng ngày 08.09,08/09/2026,HOÀN THÀNH ,0 SKU ,5212,5212,5159,53,62,"99,0%"
+22,KFM_FROZEN_NSO_A250,PT1783212,hàng ĐÔNG NSO đợt 1 đi hàng ngày 11.09,11/09/2026,HOÀN THÀNH ,0 SKU ,739,739,731,8,64,"98,9%"
+23,KFM_FROZEN_090926,PT1783893,hàng ĐÔNG đi hàng ngày 09.09,09/09/2026,HOÀN THÀNH ,0 SKU ,10366,10366,10366,0,94,"100,0%"
+24,KFM_FROZEN_100926,PT1789442,hàng ĐÔNG đi hàng ngày 10.09,10/09/2026,HOÀN THÀNH ,0 SKU ,11876,11876,11876,0,102,"100,0%"
+25,KFM_FROZEN_DL_NSO_110926,PT1795286,hàng đông NSO đợt 2 và đông daily đi hàng 11.09,11/09/2026,HOÀN THÀNH ,0 sku,12747,12571,12571,0,112,"98,6%"
+26,KFM_FROZEN_120926,PT1801223,hàng ĐÔNG đi hàng ngày 12.09,12/09/2026,HOÀN THÀNH ,0 SKU ,13355,13355,13257,98,108,"99,3%"
+27,KFM_FROZEN_130926,PT1807225,hàng ĐÔNG đi hàng ngày 13.09,13/09/2026,HOÀN THÀNH ,2 SKU,12635,12635,12605,30,112,"99,8%"
+28,KFM_FROZEN_CA250,PT1808173,châm NSO,13/09/2026,HOÀN THÀNH ,0 SKU,106,106,106,0,15,"100,0%"
+29,KFM_FROZEN_140926,PT1811728,hàng ĐÔNG đi hàng ngày 14.09,14/09/2026,HOÀN THÀNH ,1 SKU,10852,10782,10782,0,105,"99,4%"
+30,KFM_FROZEN_160926,PT1823756,hàng ĐÔNG đi hàng ngày 16.09,16/09/2026,HOÀN THÀNH ,0 sku,10602,10602,10602,0,107,"100,0%"
+31,KFM_FROZEN_NSO_180926,PT1823803,ĐƠN NSO,18/09/2026,HOÀN THÀNH ,9 sku,2475,2285,2292,7,88,"92,6%"
+32,KFM_FROZEN_170926,PT1828684,Em gửi booking hàng đông giao ngày 17/09,17/09/2026,HOÀN THÀNH ,0 sku,11700,11700,11684,16,106,"99,9%"
+33,KFM_FROZEN_BS_170926,PT1829883,BS KEM,17/09/2026,HOÀN THÀNH ,0 SKU,16,16,16,0,4,"100,0%"
+34,KFM_FROZEN_BSD2_170926,PT1830637,BS CHẢ GIÒ,17/09/2026,HOÀN THÀNH ,0 SKU,88,88,88,0,8,"100,0%"
+35,KFM_FROZEN_180926,PT1835454,Em gửi booking hàng đông giao ngày 18/09,18/09/2026,HOÀN THÀNH ,0 SKU,9387,9387,9375,12,96,"99,9%"
+36,KFM_FROZEN_NS0_BS,PT1836248,BS NSO 18/09,18/09/2026,HOÀN THÀNH ,0 SKU,56,56,56,0,11,"100,0%"
+37,KFM_FROZEN_190926,PT1841684,booking hàng đông giao ngày 19/09,19/09/2026,HOÀN THÀNH ,0 SKU,8756,8756,8756,0,94,"100,0%"
+38,KFM_FROZEN_BS_190926,PT1842524,booking hàng đông giao ngày 19/09,19/09/2026,HOÀN THÀNH ,0 SKU,1431,1431,1431,0,32,"100,0%"
+39,KFM_FROZEN_200926,PT1847464,booking hàng đông giao ngày 20/09,20/09/2026,HOÀN THÀNH ,0 SKU,11689,11689,11689,0,84,"100,0%"
+40,KFM_FROZEN_BS_NSO_200926,PT1847911,booking NSO hàng đông giao ngày 20/09,20/09/2026,HOÀN THÀNH ,0 SKU,338,338,338,0,21,"100,0%"
+41,KFM_FROZEN_210926,PT1848061,booking hàng đông giao ngày 21/09,21/09/2026,HOÀN THÀNH ,0 SKU,11898,11898,11898,0,87,"100,0%"
+42,KFM_FROZEN_240926,PT1857959,booking hàng đông giao cho 2 NSO A215 A247 ngày 24/09,24/09/2026,HOÀN THÀNH ,0 SKU,1492,1492,1492,0,72,"100,0%"
+43,KFM_FROZEN_220926,PT1858668,booking hàng đông giao ngày 22/09,22/09/2026,HOÀN THÀNH ,0 SKU,10828,10828,10828,0,95,"100,0%"
+44,KFM_FROZEN_230926,PT1864360,Booking hàng ĐÔNG đi hàng ngày 23.09,23/09/2026,HOÀN THÀNH ,0 SKU,14203,14203,14203,0,107,"100,0%"
+45,KFM_FROZEN_DL_240926,PT1870253,Booking ĐÔNG và ĐÔNG booking đợt 2 NSO đi hàng ngày 24.09,24/09/2026,HOÀN THÀNH ,1 SKU ,15702,15680,15600,22,104,"99,4%"
+46,KFM_FROZEN_250926,PT1875803,Booking ĐÔNG đi hàng ngày 25.09,25/09/2026,HOÀN THÀNH ,1 SKU ,11369,11285,11285,84,98,"99,3%"
+47,KFM_FROZEN_BS_250926,PT1876703,Booking ĐÔNG đi hàng ngày 25.09 - bổ sung,25/09/2026,HOÀN THÀNH ,0 SKU,142,142,142,0,25,"100,0%"
+48,KFM_FROZEN_260926,PT1881689,booking hàng ĐÔNG đi hàng ngày 26.09,26/09/2026,HOÀN THÀNH ,1 SKU,18842,18792,18792,50,105,"99,7%"
+49,KFM_FROZEN_BS_NSO_260926,PT1882705,booking châm hàng đông NSO đi hàng ngày 26.09,26/09/2026,HOÀN THÀNH ,0 SKU ,221,221,221,0,21,"100,0%"
+50,KFM_FROZEN_290926,PT1897483,File boooking hàng ĐÔNG đi hàng ngày 29.09,29/09/2026,HOÀN THÀNH ,0 SKU,19310,19310,19310,0,132,"100,0%"
+51,KFM_FROZEN_300926,PT1902740,booking hàng ĐÔNG đi hàng ngày 30.09,30/09/2026,CHƯA PICK ,0 SKU,19208,19208,,,121,
+52,FROZEN_NSO_021026,PT1902070,booking hàng ĐÔNG NSO đợt 1 đi hàng ngày 02.10,02/10/2026,CHƯA PICK ,0 SKU,647,647,,,58,`;
+
+    // ---------- TAB NAVIGATION SWITCHER ----------
+    function switchMainTab(targetTabId) {
+      document.querySelectorAll('.main-tab-content').forEach(el => el.classList.add('hidden'));
+      const target = document.getElementById(targetTabId);
+      if (target) target.classList.remove('hidden');
+
+      const btnMap = {
+        'tab-dashboard': 'navBtnDashboard',
+        'tab-tool1': 'navBtnTool1',
+        'tab-tool2': 'navBtnTool2',
+        'tab-tool3': 'navBtnTool3'
+      };
+
+      Object.values(btnMap).forEach(btnId => {
+        const btn = document.getElementById(btnId);
+        if (btn) {
+          btn.className = 'px-3 py-1.5 rounded-lg text-slate-400 hover:text-white flex items-center gap-1.5 transition';
+        }
+      });
+
+      const activeBtnId = btnMap[targetTabId];
+      if (activeBtnId) {
+        const activeBtn = document.getElementById(activeBtnId);
+        if (activeBtn) {
+          activeBtn.className = 'px-3 py-1.5 rounded-lg bg-cyan-600 text-white shadow-sm flex items-center gap-1.5 transition';
+        }
+      }
+
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function goToTool1WithWave() {
+      closeModal();
+      switchMainTab('tab-tool1');
+      if (currentSelectedWaveObj) {
+        const select = document.getElementById('t1TargetWaveSelect');
+        if (select) select.value = currentSelectedWaveObj.wave;
+      }
+    }
+
+    // ---------- CSV PARSING & DATA INITIALIZATION ----------
+    function parseDate(dateStr) {
+      if (!dateStr) return new Date(0);
+      const parts = dateStr.trim().split('/');
+      if (parts.length === 3) {
+        const d = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10) - 1;
+        let y = parseInt(parts[2], 10);
+        if (y < 100) y += 2000;
+        return new Date(y, m, d);
+      }
+      return new Date(0);
+    }
+
+    function formatISODate(d) {
+      if (!d || isNaN(d.getTime())) return '';
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
+
+    function parseCSV(text) {
+      const lines = text.trim().split(/\r?\n/);
+      if (lines.length < 2) return [];
+
+      const headers = parseCSVLine(lines[0]).map(h => h.trim());
+      
+      const list = [];
+      for (let i = 1; i < lines.length; i++) {
+        const rawLine = lines[i].trim();
+        if (!rawLine) continue;
+        const cols = parseCSVLine(rawLine);
+        
+        const row = {};
+        headers.forEach((h, idx) => {
+          row[h] = cols[idx] ? cols[idx].trim() : '';
+        });
+
+        const waveName = (row['TÊN WAVE'] || '').trim();
+        const ptNumber = (row['SỐ PT'] || '').trim();
+        if (!waveName && !ptNumber) continue;
+
+        const cleanNum = (val) => {
+          if (!val) return 0;
+          const cleaned = val.replace(/[^0-9.-]/g, '');
+          const n = parseFloat(cleaned);
+          return isNaN(n) ? 0 : n;
+        };
+
+        const rateStr = row['TỶ LỆ'] || '0%';
+        const rateVal = parseFloat(rateStr.replace('%', '').replace(',', '.')) || 0;
+
+        const shortStr = row['SHORT'] || '';
+        const shortSkuCount = parseInt(shortStr.replace(/[^0-9]/g, '')) || 0;
+
+        let dateStr = row['NGÀY ĐI HÀNG'] || '';
+        if (dateStr === '26/06/2026' && (row['LOẠI ĐƠN'] || '').includes('26.08')) {
+          dateStr = '26/08/2026';
+        }
+
+        const dateObj = parseDate(dateStr);
+        let monthYear = '';
+        if (dateStr) {
+          const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+          const y = dateObj.getFullYear();
+          monthYear = `${m}/${y}`;
+        }
+
+        const rawStatus = (row['TRẠNG THÁI'] || 'HOÀN THÀNH').trim();
+
+        const droppedVal = cleanNum(
+          row['SỐ LƯỢNG UNIT RỚT ĐƠN HÀNG'] || 
+          row['SỐ LƯỢNG RỚT ĐƠN HÀNG'] || 
+          row['UNIT RỚT'] || 
+          row['RỚT ĐƠN'] || 
+          ''
+        );
+
+        const skuCount = cleanNum(
+          row['SỐ LƯỢNG SKU /ĐƠN HÀNG'] || 
+          row['SỐ LƯỢNG SKU/ĐƠN HÀNG'] || 
+          row['SỐ LƯỢNG SKU / ĐƠN HÀNG'] || 
+          row['SKU / ĐƠN'] || 
+          row['SKU/ĐƠN'] || 
+          ''
+        );
+
+        const savedRecon = getSavedReconciliation(waveName, ptNumber);
+
+        list.push({
+          stt: parseInt(row['STT']) || i,
+          wave: waveName,
+          pt: ptNumber,
+          type: row['LOẠI ĐƠN'] || '',
+          date: dateStr,
+          dateObj: dateObj,
+          monthYear: monthYear,
+          status: rawStatus,
+          shortText: shortStr,
+          shortSkuCount: shortSkuCount,
+          skuPerOrder: skuCount,
+          total: cleanNum(row['TỔNG LƯỢNG']),
+          allocated: cleanNum(row['LƯỢNG ALLOCATE ĐƯỢC']),
+          picked: cleanNum(row['LƯỢNG PICK']),
+          dropped: droppedVal,
+          diffRatio: row['TỶ LỆ CHÊNH LỆCH'] || '',
+          rate: rateVal,
+          rateFormatted: (rateVal.toFixed(1) + '%').replace('.', ','),
+          reconcile: savedRecon
+        });
+      }
+      return list;
+    }
+
+    function parseCSVLine(line) {
+      const result = [];
+      let cur = '';
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        if (char === '"') {
+          inQuotes = !inQuotes;
+        } else if (char === ',' && !inQuotes) {
+          result.push(cur);
+          cur = '';
+        } else {
+          cur += char;
+        }
+      }
+      result.push(cur);
+      return result;
+    }
+
+    // ---------- FETCH LIVE GOOGLE SHEETS ----------
+    async function fetchLiveSheet() {
+      const refreshIcon = document.getElementById('refreshIcon');
+      if (refreshIcon) refreshIcon.classList.add('animate-spin');
+      const syncStatus = document.getElementById('syncStatus');
+      syncStatus.innerHTML = '<span class="text-amber-300">Đang đồng bộ...</span>';
+
+      try {
+        const response = await fetch(CSV_URL + '&t=' + Date.now(), { cache: 'no-store' });
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        const text = await response.text();
+        if (!text || text.length < 50 || !text.includes('TÊN WAVE')) {
+          throw new Error('Dữ liệu trả về không hợp lệ');
+        }
+        rawOrders = parseCSV(text);
+        syncStatus.innerHTML = '<span class="text-emerald-400 font-semibold">Google Sheets Live</span>';
+      } catch (err) {
+        console.warn('Fallback to local snapshot dataset.', err);
+        rawOrders = parseCSV(INITIAL_CSV_DATA);
+        syncStatus.innerHTML = '<span class="text-rose-400" title="' + err.message + '">Dữ liệu lưu tạm</span>';
+      } finally {
+        setTimeout(() => {
+          if (refreshIcon) refreshIcon.classList.remove('animate-spin');
+        }, 500);
+        document.getElementById('lastUpdated').innerText = new Date().toLocaleTimeString('vi-VN');
+        populateMonthOptions();
+        populateT1WaveSelector();
+        initDateRangeInputs();
+        applyFilters();
+      }
+    }
+
+    function populateMonthOptions() {
+      const select = document.getElementById('filterMonth');
+      const currentVal = select.value;
+
+      const monthsSet = new Set();
+      rawOrders.forEach(o => {
+        if (o.monthYear) monthsSet.add(o.monthYear);
+      });
+
+      availableMonths = Array.from(monthsSet).sort((a, b) => {
+        const [ma, ya] = a.split('/').map(Number);
+        const [mb, yb] = b.split('/').map(Number);
+        return (yb * 100 + mb) - (ya * 100 + ma);
+      });
+
+      select.innerHTML = '<option value="ALL">🗓️ Toàn bộ các tháng</option>';
+      availableMonths.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m;
+        opt.innerText = `Tháng ${m}`;
+        select.appendChild(opt);
+      });
+
+      if (currentVal && (currentVal === 'ALL' || availableMonths.includes(currentVal))) {
+        select.value = currentVal;
+      }
+    }
+
+    function initDateRangeInputs() {
+      if (rawOrders.length === 0) return;
+      const validDates = rawOrders.map(o => o.dateObj).filter(d => d.getTime() > 0).sort((a, b) => a - b);
+      if (validDates.length > 0) {
+        const startInput = document.getElementById('filterStartDate');
+        const endInput = document.getElementById('filterEndDate');
+        if (!startInput.value) startInput.value = formatISODate(validDates[0]);
+        if (!endInput.value) endInput.value = formatISODate(validDates[validDates.length - 1]);
+      }
+    }
+
+    function populateT1WaveSelector() {
+      const select = document.getElementById('t1TargetWaveSelect');
+      if (!select) return;
+      const currentVal = select.value;
+
+      select.innerHTML = '<option value="">-- Chọn Wave để gán --</option>';
+      rawOrders.forEach(o => {
+        const opt = document.createElement('option');
+        opt.value = o.wave;
+        const statusTag = o.reconcile ? (o.reconcile.overStockCount > 0 ? ' [⚠️ Vượt tồn ' + o.reconcile.overStockCount + ' SKU]' : ' [✅ Đủ tồn]') : '';
+        opt.textContent = `${o.wave} (${o.pt}) - ${o.date}${statusTag}`;
+        select.appendChild(opt);
+      });
+
+      if (currentVal && select.querySelector(`option[value="${currentVal}"]`)) {
+        select.value = currentVal;
+      }
+    }
+
+    // ---------- FILTER LOGIC ----------
+    function switchFilterMode(mode) {
+      filterTimeMode = mode;
+      const btnMonth = document.getElementById('btnModeMonth');
+      const btnRange = document.getElementById('btnModeRange');
+      const monthContainer = document.getElementById('filterMonthContainer');
+      const rangeContainer = document.getElementById('filterRangeContainer');
+      const searchContainer = document.getElementById('searchContainer');
+
+      if (mode === 'month') {
+        btnMonth.className = 'px-3 py-1 rounded-md bg-cyan-600 text-white font-bold transition';
+        btnRange.className = 'px-3 py-1 rounded-md text-slate-400 hover:text-white transition';
+        monthContainer.classList.remove('hidden');
+        rangeContainer.classList.add('hidden');
+        searchContainer.className = 'lg:col-span-3';
+      } else {
+        btnRange.className = 'px-3 py-1 rounded-md bg-cyan-600 text-white font-bold transition';
+        btnMonth.className = 'px-3 py-1 rounded-md text-slate-400 hover:text-white transition';
+        rangeContainer.classList.remove('hidden');
+        monthContainer.classList.add('hidden');
+        searchContainer.className = 'lg:col-span-2';
+      }
+      applyFilters();
+    }
+
+    function selectMonthFast(m) {
+      switchFilterMode('month');
+      document.getElementById('filterMonth').value = m;
+      applyFilters();
+    }
+
+    function selectDaysFast(daysCount) {
+      switchFilterMode('range');
+      const validDates = rawOrders.map(o => o.dateObj).filter(d => d.getTime() > 0).sort((a, b) => a - b);
+      if (validDates.length > 0) {
+        const lastDate = validDates[validDates.length - 1];
+        const startDate = new Date(lastDate.getTime() - (daysCount - 1) * 86400000);
+        document.getElementById('filterStartDate').value = formatISODate(startDate);
+        document.getElementById('filterEndDate').value = formatISODate(lastDate);
+      }
+      applyFilters();
+    }
+
+    function handleFilterChange() {
+      applyFilters();
+    }
+
+    function setFilterQuick(mode) {
+      if (mode === 'NSO') {
+        document.getElementById('filterType').value = 'NSO';
+        document.getElementById('filterRate').value = 'ALL';
+        document.getElementById('filterReconStatus').value = 'ALL';
+      } else if (mode === 'DAILY') {
+        document.getElementById('filterType').value = 'DAILY';
+        document.getElementById('filterRate').value = 'ALL';
+        document.getElementById('filterReconStatus').value = 'ALL';
+      } else if (mode === 'SHORT') {
+        document.getElementById('filterRate').value = 'SHORT';
+        document.getElementById('filterType').value = 'ALL';
+      } else if (mode === 'OVER') {
+        document.getElementById('filterReconStatus').value = 'OVER';
+      } else if (mode === '100') {
+        document.getElementById('filterRate').value = '100';
+        document.getElementById('filterType').value = 'ALL';
+      }
+      applyFilters();
+    }
+
+    function resetFilters() {
+      document.getElementById('searchInput').value = '';
+      document.getElementById('filterMonth').value = 'ALL';
+      document.getElementById('filterType').value = 'ALL';
+      document.getElementById('filterRate').value = 'ALL';
+      document.getElementById('filterReconStatus').value = 'ALL';
+      switchFilterMode('month');
+      applyFilters();
+    }
+
+    function applyFilters() {
+      const search = (document.getElementById('searchInput').value || '').toLowerCase().trim();
+      const typeFilter = document.getElementById('filterType').value;
+      const rateFilter = document.getElementById('filterRate').value;
+      const reconFilter = document.getElementById('filterReconStatus').value;
+
+      let labelText = '';
+
+      if (filterTimeMode === 'month') {
+        const monthFilter = document.getElementById('filterMonth').value;
+        filteredOrders = rawOrders.filter(item => {
+          if (monthFilter !== 'ALL' && item.monthYear !== monthFilter) return false;
+          return true;
+        });
+        labelText = monthFilter === 'ALL' ? 'TOÀN BỘ THỜI GIAN' : `THÁNG ${monthFilter}`;
+      } else {
+        const startStr = document.getElementById('filterStartDate').value;
+        const endStr = document.getElementById('filterEndDate').value;
+        const startDate = startStr ? new Date(startStr + 'T00:00:00') : new Date(0);
+        const endDate = endStr ? new Date(endStr + 'T23:59:59') : new Date(8640000000000000);
+
+        filteredOrders = rawOrders.filter(item => {
+          if (item.dateObj.getTime() < startDate.getTime() || item.dateObj.getTime() > endDate.getTime()) {
+            return false;
+          }
+          return true;
+        });
+
+        const fmtDateVi = (isoStr) => {
+          if (!isoStr) return '';
+          const [y, m, d] = isoStr.split('-');
+          return `${d}/${m}/${y}`;
+        };
+        labelText = `TỪ ${fmtDateVi(startStr) || 'ĐẦU KỲ'} ĐẾN ${fmtDateVi(endStr) || 'HÔM NAY'}`;
+      }
+
+      filteredOrders = filteredOrders.filter(item => {
+        if (search) {
+          const matchSearch = item.wave.toLowerCase().includes(search) || 
+                              item.pt.toLowerCase().includes(search) || 
+                              item.type.toLowerCase().includes(search) ||
+                              item.date.includes(search);
+          if (!matchSearch) return false;
+        }
+
+        if (typeFilter !== 'ALL') {
+          const typeUpper = (item.type + ' ' + item.wave).toUpperCase();
+          if (typeFilter === 'DAILY' && !typeUpper.includes('DAILY')) return false;
+          if (typeFilter === 'NSO' && !typeUpper.includes('NSO')) return false;
+          if (typeFilter === 'BS' && !typeUpper.includes('BS') && !typeUpper.includes('BỔ SUNG')) return false;
+          if (typeFilter === 'CHAM' && !typeUpper.includes('CHÂM') && !typeUpper.includes('CHAM') && !typeUpper.includes('CNSO')) return false;
+        }
+
+        if (rateFilter === '100' && item.rate < 99.99) return false;
+        if (rateFilter === '95' && (item.rate < 95 || item.rate >= 99.99)) return false;
+        if (rateFilter === 'UNDER95' && item.rate >= 95) return false;
+        if (rateFilter === 'SHORT' && item.shortSkuCount === 0 && item.dropped === 0) return false;
+
+        if (reconFilter === 'OVER' && (!item.reconcile || item.reconcile.overStockCount === 0)) return false;
+        if (reconFilter === 'OK' && (!item.reconcile || item.reconcile.overStockCount > 0)) return false;
+        if (reconFilter === 'NONE' && item.reconcile) return false;
+
+        return true;
+      });
+
+      document.getElementById('currentPeriodLabel').innerText = labelText;
+      document.getElementById('tablePeriodSubtitle').innerText = `(${labelText})`;
+      document.getElementById('printReportSubtitle').innerText = `Kỳ báo cáo: ${labelText} | Ngày xuất: ${new Date().toLocaleDateString('vi-VN')} ${new Date().toLocaleTimeString('vi-VN')}`;
+
+      sortData();
+      renderDashboard();
+    }
+
+    function sortTable(field) {
+      if (sortField === field) {
+        sortAsc = !sortAsc;
+      } else {
+        sortField = field;
+        sortAsc = true;
+      }
+      sortData();
+      renderDashboard();
+    }
+
+    function sortData() {
+      filteredOrders.sort((a, b) => {
+        let valA = a[sortField];
+        let valB = b[sortField];
+
+        if (sortField === 'date') {
+          valA = a.dateObj.getTime();
+          valB = b.dateObj.getTime();
+        } else if (sortField === 'recon') {
+          valA = a.reconcile ? a.reconcile.overStockCount : -1;
+          valB = b.reconcile ? b.reconcile.overStockCount : -1;
+        }
+
+        if (typeof valA === 'string') {
+          return sortAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
+        }
+        return sortAsc ? (valA || 0) - (valB || 0) : (valB || 0) - (valA || 0);
+      });
+    }
+
+    function renderDashboard() {
+      renderKPIs();
+      renderVisualSection();
+      renderTable();
+      document.getElementById('resultCount').innerText = `Hiển thị ${filteredOrders.length} / ${rawOrders.length} đơn`;
+    }
+
+    function renderKPIs() {
+      const count = filteredOrders.length;
+      document.getElementById('kpiTotalWaves').innerText = count;
+      
+      const completed = filteredOrders.filter(o => o.status === 'HOÀN THÀNH').length;
+      document.getElementById('kpiCompletedWaves').innerText = `${completed} Wave`;
+
+      const totalDemand = filteredOrders.reduce((acc, o) => acc + o.total, 0);
+      const totalAllocated = filteredOrders.reduce((acc, o) => acc + o.allocated, 0);
+      const totalPicked = filteredOrders.reduce((acc, o) => acc + o.picked, 0);
+      const totalShort = filteredOrders.reduce((acc, o) => acc + Math.abs(o.dropped), 0);
+
+      document.getElementById('kpiTotalDemand').innerText = totalDemand.toLocaleString('vi-VN');
+      document.getElementById('kpiTotalAllocated').innerText = totalAllocated.toLocaleString('vi-VN');
+      document.getElementById('kpiTotalPicked').innerText = totalPicked.toLocaleString('vi-VN');
+      document.getElementById('kpiTotalShort').innerText = totalShort.toLocaleString('vi-VN');
+
+      const pickRatio = totalDemand > 0 ? ((totalPicked / totalDemand) * 100).toFixed(1) : 0;
+      document.getElementById('kpiPickRatio').innerText = `${pickRatio}% tổng lượng`;
+
+      const wavesWithShort = filteredOrders.filter(o => o.shortSkuCount > 0 || o.dropped < 0).length;
+      document.getElementById('kpiWavesWithShort').innerText = wavesWithShort;
+
+      const avgRate = count > 0 ? (filteredOrders.reduce((acc, o) => acc + o.rate, 0) / count).toFixed(1) : 0;
+      document.getElementById('kpiAvgRate').innerText = `${avgRate}%`;
+
+      const perfectCount = filteredOrders.filter(o => o.rate >= 99.99).length;
+      const perfectPct = count > 0 ? Math.round((perfectCount / count) * 100) : 0;
+      document.getElementById('kpiPerfectRate').innerText = `${perfectPct}% đạt 100% (${perfectCount} Wave)`;
+    }
+
+    // ---------- VISUAL SECTION CONTROLLER ----------
+    function switchVisualMode(mode) {
+      visualMode = mode;
+      
+      const tabVol = document.getElementById('tabVolume');
+      const tabRate = document.getElementById('tabRate');
+      const tabCards = document.getElementById('tabCards');
+
+      const activeClass = 'px-3 py-1.5 rounded-lg bg-cyan-600 text-white font-semibold transition flex items-center gap-1.5 shadow-sm';
+      const inactiveClass = 'px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition flex items-center gap-1.5';
+
+      tabVol.className = mode === 'volume' ? activeClass : inactiveClass;
+      tabRate.className = mode === 'rate' ? activeClass : inactiveClass;
+      tabCards.className = mode === 'cards' ? activeClass : inactiveClass;
+
+      const svgWrap = document.getElementById('chartSvgWrapper');
+      const cardsWrap = document.getElementById('dailyCardsWrapper');
+
+      if (mode === 'cards') {
+        svgWrap.classList.add('hidden');
+        cardsWrap.classList.remove('hidden');
+        document.getElementById('chartViewTitle').innerText = '🗂️ Bảng Thẻ Quản Lý Vận Hành Từng Ngày';
+        document.getElementById('chartViewDescription').innerText = 'Trực quan từng ngày xuất kho: Số Wave, Khối lượng yêu cầu, Thực tế Pick, Lượng hụt và Tỷ lệ %';
+      } else if (mode === 'volume') {
+        svgWrap.classList.remove('hidden');
+        cardsWrap.classList.add('hidden');
+        document.getElementById('chartViewTitle').innerText = '📊 So Sánh Sản Lượng: Yêu Cầu vs Thực Tế Pick Theo Ngày';
+        document.getElementById('chartViewDescription').innerText = 'Cột đôi so sánh số lượng đơn đặt (Xanh dương) và số lượng thực tế soạn được (Xanh lá / Đỏ nếu hụt)';
+      } else {
+        svgWrap.classList.remove('hidden');
+        cardsWrap.classList.add('hidden');
+        document.getElementById('chartViewTitle').innerText = '📈 Xu Hướng Tỷ Lệ Hoàn Thành (%) (Trục Y Tối Ưu 60% - 100%)';
+        document.getElementById('chartViewDescription').innerText = 'Phóng to dải tỷ lệ 60% - 100% giúp thấy ngay ngày nào bị tụt sâu và ngày nào đạt chuẩn 100%';
+      }
+
+      renderVisualSection();
+    }
+
+    function renderVisualSection() {
+      const dailyMap = new Map();
+      filteredOrders.forEach(o => {
+        const d = o.date;
+        if (!dailyMap.has(d)) {
+          dailyMap.set(d, {
+            date: d,
+            dateObj: o.dateObj,
+            demand: 0,
+            allocated: 0,
+            picked: 0,
+            dropped: 0,
+            shortSkuTotal: 0,
+            waves: []
+          });
+        }
+        const item = dailyMap.get(d);
+        item.demand += o.total;
+        item.allocated += o.allocated;
+        item.picked += o.picked;
+        item.dropped += o.dropped;
+        item.shortSkuTotal += o.shortSkuCount;
+        item.waves.push(o);
+      });
+
+      let daysList = Array.from(dailyMap.values()).sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime());
+
+      const timeSpan = document.getElementById('chartTimeSpan').value;
+      if (timeSpan !== 'ALL') {
+        const count = parseInt(timeSpan);
+        daysList = daysList.slice(-count);
+      }
+
+      document.getElementById('chartItemsCount').innerText = `${daysList.length} Ngày đi hàng`;
+
+      const legend = document.getElementById('chartLegend');
+      if (visualMode === 'volume') {
+        legend.innerHTML = `
+          <div class="flex items-center gap-4 flex-wrap">
+            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-blue-500"></span> <b>Lượng Yêu Cầu</b></span>
+            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-emerald-500"></span> <b>Thực Tế Pick Đạt (≥95%)</b></span>
+            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-amber-500"></span> <b>Pick Đạt (80-95%)</b></span>
+            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-rose-500"></span> <b>Pick Kém (&lt;80%)</b></span>
+          </div>
+          <div class="text-[11px] text-slate-400">Đơn vị: Sản phẩm</div>
+        `;
+        renderVolumeChart(daysList);
+      } else if (visualMode === 'rate') {
+        legend.innerHTML = `
+          <div class="flex items-center gap-4 flex-wrap">
+            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-emerald-400"></span> Đạt Chuẩn (≥95%)</span>
+            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-amber-400"></span> Cảnh Báo (80% - 95%)</span>
+            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded bg-rose-400"></span> Rớt Sâu (&lt;80%)</span>
+          </div>
+          <div class="text-[11px] text-cyan-400 font-semibold">Trục Y: Zoom cận cảnh từ 60% đến 100%</div>
+        `;
+        renderZoomRateChart(daysList);
+      } else {
+        renderDailyCards(daysList);
+      }
+    }
+
+    function renderVolumeChart(daysList) {
+      const svg = document.getElementById('mainInteractiveSvg');
+      svg.innerHTML = '';
+
+      if (daysList.length === 0) {
+        svg.innerHTML = `<text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#94a3b8" font-size="13">Không có dữ liệu trong kỳ này</text>`;
+        return;
+      }
+
+      const maxDemand = Math.max(...daysList.map(d => Math.max(d.demand, d.picked)), 1000);
+      const roundedMax = Math.ceil(maxDemand / 2000) * 2000;
+
+      const chartW = Math.max(760, daysList.length * 56 + 100);
+      const chartH = 300;
+      const topPad = 35;
+      const bottomPad = 225;
+      const drawHeight = bottomPad - topPad;
+
+      svg.setAttribute('viewBox', `0 0 ${chartW} ${chartH}`);
+
+      [1, 0.75, 0.5, 0.25].forEach(ratio => {
+        const y = bottomPad - ratio * drawHeight;
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', '55');
+        line.setAttribute('x2', chartW - 20);
+        line.setAttribute('y1', y);
+        line.setAttribute('y2', y);
+        line.setAttribute('stroke', '#334155');
+        line.setAttribute('stroke-dasharray', '3 3');
+        svg.appendChild(line);
+
+        const val = Math.round(roundedMax * ratio);
+        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('x', '12');
+        text.setAttribute('y', y + 4);
+        text.setAttribute('fill', '#64748b');
+        text.setAttribute('font-size', '10');
+        text.setAttribute('font-family', 'monospace');
+        text.textContent = val >= 1000 ? (val / 1000).toFixed(1) + 'k' : val;
+        svg.appendChild(text);
+      });
+
+      const step = (chartW - 90) / daysList.length;
+      const groupWidth = Math.min(36, step - 10);
+      const barW = groupWidth / 2 - 2;
+
+      daysList.forEach((d, idx) => {
+        const groupX = 65 + idx * step;
+        const rate = d.demand > 0 ? (d.picked / d.demand) * 100 : 0;
+
+        const demandH = (d.demand / roundedMax) * drawHeight;
+        const demandY = bottomPad - demandH;
+
+        const rectDemand = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        rectDemand.setAttribute('x', groupX);
+        rectDemand.setAttribute('y', demandY);
+        rectDemand.setAttribute('width', barW);
+        rectDemand.setAttribute('height', Math.max(4, demandH));
+        rectDemand.setAttribute('rx', '3');
+        rectDemand.setAttribute('fill', '#3b82f6');
+        rectDemand.setAttribute('class', 'hover:opacity-80 cursor-pointer transition');
+        
+        const titleD = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+        titleD.textContent = `Ngày: ${d.date}\nYêu Cầu: ${d.demand.toLocaleString()} sp\n(${d.waves.length} Wave)`;
+        rectDemand.appendChild(titleD);
+        rectDemand.onclick = () => openModal(d.waves[0]);
+        svg.appendChild(rectDemand);
+
+        const pickH = (d.picked / roundedMax) * drawHeight;
+        const pickY = bottomPad - pickH;
+
+        let pickColor = '#10b981';
+        if (rate < 80) pickColor = '#f43f5e';
+        else if (rate < 95) pickColor = '#f59e0b';
+
+        const rectPick = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        rectPick.setAttribute('x', groupX + barW + 3);
+        rectPick.setAttribute('y', pickY);
+        rectPick.setAttribute('width', barW);
+        rectPick.setAttribute('height', Math.max(4, pickH));
+        rectPick.setAttribute('rx', '3');
+        rectPick.setAttribute('fill', pickColor);
+        rectPick.setAttribute('class', 'hover:opacity-80 cursor-pointer transition');
+
+        const titleP = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+        titleP.textContent = `Ngày: ${d.date}\nThực Tế Pick: ${d.picked.toLocaleString()} sp\nTỷ lệ: ${rate.toFixed(1)}%\nHụt: ${Math.abs(d.dropped).toLocaleString()} sp`;
+        rectPick.appendChild(titleP);
+        rectPick.onclick = () => openModal(d.waves[0]);
+        svg.appendChild(rectPick);
+
+        const badgeY = Math.min(demandY, pickY) - 5;
+        const pctText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        pctText.setAttribute('x', groupX + groupWidth / 2);
+        pctText.setAttribute('y', Math.max(16, badgeY));
+        pctText.setAttribute('fill', pickColor);
+        pctText.setAttribute('font-size', '9');
+        pctText.setAttribute('font-weight', 'bold');
+        pctText.setAttribute('text-anchor', 'middle');
+        pctText.textContent = rate.toFixed(1) + '%';
+        svg.appendChild(pctText);
+
+        const labelX = groupX + groupWidth / 2;
+        const labelY = bottomPad + 14;
+        const dateText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        dateText.setAttribute('x', labelX);
+        dateText.setAttribute('y', labelY);
+        dateText.setAttribute('fill', '#94a3b8');
+        dateText.setAttribute('font-size', '9');
+        dateText.setAttribute('font-weight', '600');
+        dateText.setAttribute('text-anchor', 'end');
+        dateText.setAttribute('transform', `rotate(-45, ${labelX}, ${labelY})`);
+        dateText.textContent = d.date.substring(0, 5);
+        svg.appendChild(dateText);
+      });
+    }
+
+    function renderZoomRateChart(daysList) {
+      const svg = document.getElementById('mainInteractiveSvg');
+      svg.innerHTML = '';
+
+      if (daysList.length === 0) {
+        svg.innerHTML = `<text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#94a3b8" font-size="13">Không có dữ liệu trong kỳ này</text>`;
+        return;
+      }
+
+      const chartW = Math.max(760, daysList.length * 48 + 100);
+      const chartH = 300;
+      const topPad = 35;
+      const bottomPad = 225;
+      const drawHeight = bottomPad - topPad;
+
+      svg.setAttribute('viewBox', `0 0 ${chartW} ${chartH}`);
+
+      [100, 90, 80, 70, 60].forEach(val => {
+        const ratio = (val - 60) / 40;
+        const y = bottomPad - ratio * drawHeight;
+
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', '50');
+        line.setAttribute('x2', chartW - 20);
+        line.setAttribute('y1', y);
+        line.setAttribute('y2', y);
+        line.setAttribute('stroke', val === 95 ? '#06b6d4' : '#334155');
+        line.setAttribute('stroke-dasharray', val === 95 ? '4 4' : '3 3');
+        line.setAttribute('stroke-width', val === 95 ? '1.5' : '1');
+        svg.appendChild(line);
+
+        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('x', '15');
+        text.setAttribute('y', y + 4);
+        text.setAttribute('fill', val === 95 ? '#06b6d4' : '#64748b');
+        text.setAttribute('font-size', '10');
+        text.setAttribute('font-weight', val === 95 ? 'bold' : 'normal');
+        text.textContent = val + '%';
+        svg.appendChild(text);
+      });
+
+      const step = (chartW - 80) / daysList.length;
+      const barW = Math.min(24, step - 8);
+
+      daysList.forEach((d, idx) => {
+        const x = 60 + idx * step;
+        const rate = d.demand > 0 ? (d.picked / d.demand) * 100 : 0;
+
+        const normalized = Math.max(60, Math.min(100, rate));
+        const barH = ((normalized - 60) / 40) * drawHeight;
+        const y = bottomPad - barH;
+
+        let color = '#10b981';
+        if (rate < 80) color = '#f43f5e';
+        else if (rate < 95) color = '#f59e0b';
+
+        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        rect.setAttribute('x', x);
+        rect.setAttribute('y', y);
+        rect.setAttribute('width', barW);
+        rect.setAttribute('height', Math.max(6, barH));
+        rect.setAttribute('rx', '4');
+        rect.setAttribute('fill', color);
+        rect.setAttribute('class', 'hover:opacity-80 cursor-pointer transition');
+
+        const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+        title.textContent = `Ngày: ${d.date}\nTỷ lệ hoàn thành: ${rate.toFixed(1)}%\nPick: ${d.picked.toLocaleString()} / ${d.demand.toLocaleString()} sp`;
+        rect.appendChild(title);
+        rect.onclick = () => openModal(d.waves[0]);
+        svg.appendChild(rect);
+
+        const textVal = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        textVal.setAttribute('x', x + barW / 2);
+        textVal.setAttribute('y', y - 4);
+        textVal.setAttribute('fill', color);
+        textVal.setAttribute('font-size', '9');
+        textVal.setAttribute('font-weight', 'bold');
+        textVal.setAttribute('text-anchor', 'middle');
+        textVal.textContent = rate.toFixed(1) + '%';
+        svg.appendChild(textVal);
+
+        const dateText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        const labelY = bottomPad + 14;
+        dateText.setAttribute('x', x + barW / 2);
+        dateText.setAttribute('y', labelY);
+        dateText.setAttribute('fill', '#94a3b8');
+        dateText.setAttribute('font-size', '9');
+        dateText.setAttribute('font-weight', '600');
+        dateText.setAttribute('text-anchor', 'end');
+        dateText.setAttribute('transform', `rotate(-45, ${x + barW / 2}, ${labelY})`);
+        dateText.textContent = d.date.substring(0, 5);
+        svg.appendChild(dateText);
+      });
+    }
+
+    function renderDailyCards(daysList) {
+      const container = document.getElementById('dailyCardsContainer');
+      container.innerHTML = '';
+
+      if (daysList.length === 0) {
+        container.innerHTML = '<div class="col-span-full py-10 text-center text-slate-400">Không có dữ liệu trong kỳ này</div>';
+        return;
+      }
+
+      daysList.forEach(d => {
+        const rate = d.demand > 0 ? (d.picked / d.demand) * 100 : 0;
+        const rateFormatted = rate.toFixed(1) + '%';
+
+        let badgeClass = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40';
+        let barColor = 'bg-emerald-500';
+        if (rate < 80) {
+          badgeClass = 'bg-rose-500/20 text-rose-300 border-rose-500/40';
+          barColor = 'bg-rose-500';
+        } else if (rate < 95) {
+          badgeClass = 'bg-amber-500/20 text-amber-300 border-amber-500/40';
+          barColor = 'bg-amber-500';
+        }
+
+        const card = document.createElement('div');
+        card.className = 'bg-slate-900/90 border border-slate-700/80 hover:border-cyan-500/60 rounded-xl p-3.5 shadow-sm transition hover:scale-[1.02] cursor-pointer';
+        card.onclick = () => {
+          document.getElementById('searchInput').value = d.date;
+          applyFilters();
+        };
+
+        const shortText = d.dropped < 0 
+          ? `<span class="text-rose-400 font-semibold">⚠️ Hụt ${Math.abs(d.dropped).toLocaleString()} sp</span>` 
+          : `<span class="text-emerald-400">Đầy đủ hàng</span>`;
+
+        card.innerHTML = `
+          <div class="flex items-center justify-between mb-2">
+            <div class="flex items-center gap-1.5 font-bold text-white text-xs">
+              <span>📅</span>
+              <span>${d.date}</span>
+            </div>
+            <span class="px-2 py-0.5 rounded-full text-[10px] font-bold border ${badgeClass}">
+              ${rateFormatted}
+            </span>
+          </div>
+
+          <div class="space-y-1.5 text-xs text-slate-300">
+            <div class="flex justify-between text-[11px]">
+              <span class="text-slate-400">Yêu cầu:</span>
+              <span class="font-semibold">${d.demand.toLocaleString()} sp</span>
+            </div>
+            <div class="flex justify-between text-[11px]">
+              <span class="text-slate-400">Đã Pick:</span>
+              <span class="font-semibold text-emerald-400">${d.picked.toLocaleString()} sp</span>
+            </div>
+            <div class="flex justify-between text-[11px]">
+              <span class="text-slate-400">Tình trạng:</span>
+              <span>${shortText}</span>
+            </div>
+          </div>
+
+          <div class="w-full bg-slate-800 rounded-full h-1.5 mt-2.5 overflow-hidden">
+            <div class="${barColor} h-full rounded-full" style="width: ${Math.min(100, rate)}%"></div>
+          </div>
+
+          <div class="mt-2 text-[10px] text-cyan-400 font-medium text-right flex justify-between items-center">
+            <span class="text-slate-400">${d.waves.length} Wave xuất</span>
+            <span>Bấm để lọc đơn ➔</span>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    // ---------- TABLE RENDERING ----------
+    function renderTable() {
+      const tbody = document.getElementById('ordersTableBody');
+      tbody.innerHTML = '';
+
+      if (filteredOrders.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="14" class="py-10 text-center text-slate-400">
+              Không tìm thấy đơn hàng nào phù hợp với kỳ báo cáo hiện tại.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      filteredOrders.forEach((o) => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-700/40 transition cursor-pointer';
+        tr.onclick = (e) => {
+          if (e.target.closest('.recon-action-btn')) return;
+          openModal(o);
+        };
+
+        let statusBadgeClass = 'bg-emerald-900/40 text-emerald-300 border-emerald-700/50';
+        if (o.status.toUpperCase().includes('CHƯA') || o.status.toUpperCase().includes('CHUA')) {
+          statusBadgeClass = 'bg-amber-900/40 text-amber-300 border-amber-600/50 font-bold';
+        } else if (o.status.toUpperCase().includes('ĐANG') || o.status.toUpperCase().includes('SOẠN')) {
+          statusBadgeClass = 'bg-cyan-900/40 text-cyan-300 border-cyan-600/50 font-bold';
+        }
+
+        let rateBadgeClass = 'bg-emerald-950/60 text-emerald-300 border-emerald-700/50';
+        let rateText = o.rateFormatted;
+        if (o.status.toUpperCase().includes('CHƯA') && o.picked === 0) {
+          rateBadgeClass = 'bg-amber-950/60 text-amber-300 border-amber-700/50 font-semibold';
+          rateText = 'Chưa pick';
+        } else if (o.rate < 80) {
+          rateBadgeClass = 'bg-rose-950/60 text-rose-300 border-rose-700/50';
+        } else if (o.rate < 95) {
+          rateBadgeClass = 'bg-amber-950/60 text-amber-300 border-amber-700/50';
+        }
+
+        let shortBadge = `<span class="text-slate-400">${o.shortText || '0 SKU'}</span>`;
+        if (o.shortSkuCount > 0) {
+          shortBadge = `<span class="px-2 py-0.5 rounded-full bg-rose-900/40 text-rose-300 font-bold border border-rose-800/40">${o.shortText}</span>`;
+        }
+
+        let droppedVal = Math.abs(o.dropped);
+        let droppedDisplay = droppedVal === 0 ? '<span class="text-slate-400">0</span>' : `<span class="text-rose-400 font-semibold">${droppedVal.toLocaleString()}</span>`;
+
+        let reconBadge = '';
+        if (o.reconcile) {
+          if (o.reconcile.overStockCount > 0) {
+            reconBadge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-950/70 text-rose-300 border border-rose-700/60 font-bold text-[10px]" title="Có ${o.reconcile.overStockCount} SKU Booking Vượt Tồn (${o.reconcile.overStockQty.toLocaleString()} sp)">⚠️ Vượt tồn: ${o.reconcile.overStockCount} SKU</span>`;
+          } else {
+            reconBadge = `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-950/70 text-emerald-300 border border-emerald-700/60 font-semibold text-[10px]">✅ Đủ tồn kho</span>`;
+          }
+        } else {
+          reconBadge = `<button onclick="openT1ForWave('${o.wave}')" class="recon-action-btn px-2 py-0.5 rounded-full bg-slate-800 hover:bg-amber-900/60 text-slate-400 hover:text-amber-300 border border-slate-700 text-[10px] transition" title="Bấm để nạp file đối chiếu cho Wave này">+ Nạp file</button>`;
+        }
+
+        tr.innerHTML = `
+          <td class="py-3 px-3 font-mono text-slate-400">${o.stt}</td>
+          <td class="py-3 px-3 font-medium text-white">${o.wave}</td>
+          <td class="py-3 px-3 font-mono text-cyan-300">${o.pt}</td>
+          <td class="py-3 px-3 max-w-[190px] truncate text-slate-300" title="${o.type}">${o.type}</td>
+          <td class="py-3 px-3 text-slate-300 font-medium">${o.date}</td>
+          <td class="py-3 px-3">
+            <span class="px-2 py-0.5 rounded-full text-[10px] border ${statusBadgeClass}">
+              ${o.status}
+            </span>
+          </td>
+          <td class="py-3 px-3">${shortBadge}</td>
+          <td class="py-3 px-3 text-right font-mono font-semibold text-cyan-200">${o.skuPerOrder > 0 ? o.skuPerOrder.toLocaleString() : '-'}</td>
+          <td class="py-3 px-3 text-right font-mono font-semibold">${o.total.toLocaleString()}</td>
+          <td class="py-3 px-3 text-right font-mono text-slate-300">${o.allocated.toLocaleString()}</td>
+          <td class="py-3 px-3 text-right font-mono font-semibold text-emerald-400">${o.picked.toLocaleString()}</td>
+          <td class="py-3 px-3 text-right font-mono">${droppedDisplay}</td>
+          <td class="py-3 px-4 text-center">
+            <span class="inline-block px-2.5 py-0.5 rounded-full font-mono text-xs font-bold border ${rateBadgeClass}">
+              ${rateText}
+            </span>
+          </td>
+          <td class="py-3 px-3 text-center">
+            ${reconBadge}
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function openT1ForWave(waveName) {
+      switchMainTab('tab-tool1');
+      const select = document.getElementById('t1TargetWaveSelect');
+      if (select) select.value = waveName;
+    }
+
+    // ---------- DETAIL MODAL ----------
+    function openModal(o) {
+      currentSelectedWaveObj = o;
+
+      document.getElementById('modalWaveName').innerText = o.wave;
+      document.getElementById('modalPt').innerText = o.pt;
+      document.getElementById('modalDate').innerText = o.date;
+      document.getElementById('modalStatus').innerText = o.status;
+      document.getElementById('modalTotal').innerText = o.total.toLocaleString() + ' sản phẩm';
+      document.getElementById('modalPicked').innerText = o.picked.toLocaleString() + ' sản phẩm';
+      document.getElementById('modalSkuPerOrder').innerText = (o.skuPerOrder > 0 ? o.skuPerOrder.toLocaleString() + ' SKU' : '-');
+      document.getElementById('modalDropped').innerText = Math.abs(o.dropped).toLocaleString() + ' unit rớt';
+      document.getElementById('modalRate').innerText = o.rateFormatted;
+      document.getElementById('modalType').innerText = o.type;
+      document.getElementById('modalShortSku').innerText = o.shortText || 'Không phát sinh short';
+
+      const badgeEl = document.getElementById('modalReconBadge');
+      const contentEl = document.getElementById('modalReconContent');
+
+      if (o.reconcile) {
+        const r = o.reconcile;
+        if (r.overStockCount > 0) {
+          badgeEl.innerHTML = `<span class="px-2.5 py-0.5 rounded-full bg-rose-900/60 text-rose-300 font-bold text-xs border border-rose-700">⚠️ VƯỢT TỒN: ${r.overStockCount} SKU (${r.overStockQty.toLocaleString()} SP)</span>`;
+        } else {
+          badgeEl.innerHTML = `<span class="px-2.5 py-0.5 rounded-full bg-emerald-900/60 text-emerald-300 font-bold text-xs border border-emerald-700">✅ 100% ĐỦ TỒN KHO</span>`;
+        }
+
+        let weightInfo = '';
+        if (r.sumKgRequested || r.sumKgAllocate) {
+          weightInfo = `
+            <div class="flex items-center gap-4 text-xs text-slate-300 pt-1">
+              <span><b>⚖️ Kg Yêu Cầu:</b> ${r.sumKgRequested ? r.sumKgRequested.toLocaleString('vi-VN', { maximumFractionDigits: 1 }) + ' kg' : '-'}</span>
+              <span><b>⚖️ Kg Allocate:</b> ${r.sumKgAllocate ? r.sumKgAllocate.toLocaleString('vi-VN', { maximumFractionDigits: 1 }) + ' kg' : '-'}</span>
+            </div>
+          `;
+        }
+
+        let itemsTable = '';
+        if (r.items && r.items.length > 0) {
+          const rowsHtml = r.items.map((item, idx) => `
+            <tr class="hover:bg-slate-800/80">
+              <td class="py-1.5 px-2 font-mono text-slate-400">${idx + 1}</td>
+              <td class="py-1.5 px-2 font-mono text-cyan-300">${item.barcode}</td>
+              <td class="py-1.5 px-2 max-w-[180px] truncate text-white" title="${item.product}">${item.product}</td>
+              <td class="py-1.5 px-2 text-right font-mono">${item.requested.toLocaleString()}</td>
+              <td class="py-1.5 px-2 text-right font-mono text-emerald-400">${item.allocate.toLocaleString()}</td>
+              <td class="py-1.5 px-2 text-right font-mono font-bold text-rose-400">${item.chenhlech.toLocaleString()}</td>
+              <td class="py-1.5 px-2 text-right font-mono text-slate-300">${item.tonkho.toLocaleString()}</td>
+              <td class="py-1.5 px-2 text-right font-mono text-amber-300">${item.kgChenhlech ? item.kgChenhlech.toFixed(1) + ' kg' : '-'}</td>
+            </tr>
+          `).join('');
+
+          itemsTable = `
+            <div class="mt-2.5 overflow-x-auto max-h-56 custom-scrollbar border border-slate-700/60 rounded-lg">
+              <table class="w-full text-left text-[11px] whitespace-nowrap">
+                <thead class="bg-slate-950 text-slate-300 sticky top-0 border-b border-slate-700">
+                  <tr>
+                    <th class="py-2 px-2">#</th>
+                    <th class="py-2 px-2">Barcode</th>
+                    <th class="py-2 px-2">Tên Hàng Hóa</th>
+                    <th class="py-2 px-2 text-right">Y/C Ban Đầu</th>
+                    <th class="py-2 px-2 text-right">Allocate</th>
+                    <th class="py-2 px-2 text-right">Chênh Lệch</th>
+                    <th class="py-2 px-2 text-right">Tồn Kho</th>
+                    <th class="py-2 px-2 text-right">Kg Hụt</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-800">
+                  ${rowsHtml}
+                </tbody>
+              </table>
+            </div>
+          `;
+        } else {
+          itemsTable = `<div class="text-xs text-emerald-400 py-2">🎉 Không có mã hàng nào bị Booking vượt tồn kho!</div>`;
+        }
+
+        contentEl.innerHTML = `
+          <div class="text-xs text-slate-300 space-y-1">
+            <div class="flex justify-between items-center">
+              <span><b>Độ khớp Barcode:</b> ${r.matchedBarcodes || 0} / ${r.distinctBarcodes || 0} mã (${r.barcodeRatio || '0%'})</span>
+              <span class="text-slate-400 text-[11px]">Cập nhật lúc: ${r.updatedAt || 'Hôm nay'}</span>
+            </div>
+            ${weightInfo}
+            ${itemsTable}
+          </div>
+        `;
+      } else {
+        badgeEl.innerHTML = `<span class="px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 text-xs border border-slate-700">Chưa nạp dữ liệu</span>`;
+        contentEl.innerHTML = `
+          <div class="text-xs text-slate-400 py-3 text-center bg-slate-950/40 rounded-lg border border-dashed border-slate-700">
+            <p>Wave này chưa được nạp file đối chiếu (Booking, Pick Tổng, KFM Stock).</p>
+            <button onclick="goToTool1WithWave()" class="mt-2 px-3 py-1 bg-amber-600/30 hover:bg-amber-600 text-amber-200 border border-amber-500/40 rounded-lg text-xs font-semibold transition">
+              📂 Chuyển sang Tool 1 để nạp file cho Wave này
+            </button>
+          </div>
+        `;
+      }
+
+      document.getElementById('detailModal').classList.remove('hidden');
+    }
+
+    function closeModal() {
+      document.getElementById('detailModal').classList.add('hidden');
+      currentSelectedWaveObj = null;
+    }
+
+    // ---------- STORAGE HELPERS ----------
+    function getStorageKey(waveName, pt) {
+      const clean = (waveName || pt || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '_');
+      return `kfm_recon_${clean}`;
+    }
+
+    function saveReconciliation(waveName, data) {
+      try {
+        const key = getStorageKey(waveName);
+        localStorage.setItem(key, JSON.stringify(data));
+      } catch (e) {
+        console.warn('LocalStorage save failed', e);
+      }
+    }
+
+    function getSavedReconciliation(waveName, pt) {
+      try {
+        const key = getStorageKey(waveName, pt);
+        const item = localStorage.getItem(key);
+        return item ? JSON.parse(item) : null;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    // ---------- EXPORT MULTI-SHEET EXCEL REPORT ----------
+    function exportExcelReport() {
+      if (filteredOrders.length === 0) {
+        alert('Không có dữ liệu trong kỳ này để xuất báo cáo!');
+        return;
+      }
+
+      const count = filteredOrders.length;
+      const totalDemand = filteredOrders.reduce((acc, o) => acc + o.total, 0);
+      const totalAllocated = filteredOrders.reduce((acc, o) => acc + o.allocated, 0);
+      const totalPicked = filteredOrders.reduce((acc, o) => acc + o.picked, 0);
+      const totalShort = filteredOrders.reduce((acc, o) => acc + Math.abs(o.dropped), 0);
+      const avgRate = count > 0 ? (filteredOrders.reduce((acc, o) => acc + o.rate, 0) / count).toFixed(1) : '0';
+      const periodLabel = document.getElementById('currentPeriodLabel').innerText;
+
+      const wb = XLSX.utils.book_new();
+
+      // Sheet 1: Tổng Quan
+      const summaryAoa = [
+        ['TẬP ĐOÀN SEEDCOM • HỆ THỐNG KHO VẬN KINGFOODMART (KFM_FROZEN)'],
+        ['BÁO CÁO TỔNG HỢP VẬN HÀNH KHO ĐÔNG'],
+        ['Kỳ báo cáo:', periodLabel],
+        ['Ngày giờ xuất:', `${new Date().toLocaleDateString('vi-VN')} ${new Date().toLocaleTimeString('vi-VN')}`],
+        ['Bộ phận vận hành:', 'Seedcom Supply Chain - WMS Kho Đông KFM Logistics'],
+        [],
+        ['--- CÁC CHỈ SỐ VẬN HÀNH CHÍNH (KPIS) ---'],
+        ['Chỉ Số Vận Hành', 'Giá Trị', 'Đơn Vị / Ghi Chú'],
+        ['Tổng số đợt sóng (Wave)', count, 'Wave xuất kho'],
+        ['Tổng lượng sản phẩm yêu cầu', totalDemand, 'Sản phẩm đặt hàng'],
+        ['Lượng đã Allocate', totalAllocated, 'Sản phẩm được chia'],
+        ['Lượng thực tế Pick', totalPicked, 'Sản phẩm đã soạn'],
+        ['Lượng rớt / hụt hàng', totalShort, 'Sản phẩm thiếu'],
+        ['Tỷ lệ hoàn thành trung bình', `${avgRate}%`, 'Tỷ lệ đáp ứng đơn hàng'],
+        ['Số Wave phát sinh rớt hàng / short', filteredOrders.filter(o => o.shortSkuCount > 0 || o.dropped < 0).length, 'Wave'],
+        ['Số Wave có mã Booking vượt tồn kho', filteredOrders.filter(o => o.reconcile && o.reconcile.overStockCount > 0).length, 'Wave']
+      ];
+      const wsSummary = XLSX.utils.aoa_to_sheet(summaryAoa);
+      XLSX.utils.book_append_sheet(wb, wsSummary, 'Tổng Quan KPI');
+
+      // Sheet 2: Chi Tiết Các Wave
+      const ordersHeader = [
+        'STT', 'Tên Wave', 'Số PT', 'Loại Đơn', 'Ngày Đi Hàng', 
+        'Trạng Thái', 'Short SKU', 'SKU / Đơn', 'Tổng Lượng Y/C', 
+        'Lượng Allocate', 'Lượng Thực Pick', 'Unit Rớt Đơn', 
+        'Tỷ Lệ Đáp Ứng', 'Tình Trạng Tồn Kho', 'Số SKU Vượt Tồn'
+      ];
+      const ordersAoa = [ordersHeader];
+
+      const sortedList = [...filteredOrders].sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime() || a.stt - b.stt);
+      sortedList.forEach(o => {
+        const reconText = o.reconcile 
+          ? (o.reconcile.overStockCount > 0 ? `Vượt tồn (${o.reconcile.overStockCount} SKU)` : 'Đủ tồn kho')
+          : 'Chưa đối chiếu';
+        const overSkuNum = o.reconcile ? o.reconcile.overStockCount : 0;
+
+        ordersAoa.push([
+          o.stt,
+          o.wave,
+          o.pt,
+          o.type,
+          o.date,
+          o.status,
+          o.shortText,
+          o.skuPerOrder,
+          o.total,
+          o.allocated,
+          o.picked,
+          Math.abs(o.dropped),
+          o.rateFormatted,
+          reconText,
+          overSkuNum
+        ]);
+      });
+      const wsOrders = XLSX.utils.aoa_to_sheet(ordersAoa);
+      XLSX.utils.book_append_sheet(wb, wsOrders, 'Chi Tiết Các Wave');
+
+      // Sheet 3: Chi Tiết SKU Booking Vượt Tồn
+      const overStockHeader = [
+        'Tên Wave', 'Số PT', 'Ngày Đi Hàng', 'Barcode', 
+        'Tên Sản Phẩm', 'Số Lượng Y/C Ban Đầu', 'SL Allocate', 
+        'Chênh Lệch (Hụt)', 'Tồn Kho', 'Kg Chênh Lệch'
+      ];
+      const overStockAoa = [overStockHeader];
+
+      sortedList.forEach(o => {
+        if (o.reconcile && o.reconcile.items && o.reconcile.items.length > 0) {
+          o.reconcile.items.forEach(it => {
+            overStockAoa.push([
+              o.wave,
+              o.pt,
+              o.date,
+              it.barcode,
+              it.product,
+              it.requested,
+              it.allocate,
+              it.chenhlech,
+              it.tonkho,
+              it.kgChenhlech || ''
+            ]);
+          });
+        }
+      });
+
+      if (overStockAoa.length > 1) {
+        const wsOverStock = XLSX.utils.aoa_to_sheet(overStockAoa);
+        XLSX.utils.book_append_sheet(wb, wsOverStock, 'SKU Vượt Tồn Kho');
+      }
+
+      const cleanFileName = `Bao_Cao_Kho_Dong_${periodLabel.replace(/[^A-Za-z0-9_]/g, '_')}.xlsx`;
+      const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+      const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = cleanFileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    function printMonthlyPDF() {
+      window.print();
+    }
+
+    // =========================================================================
+    // CORE LOGIC: TOOL 1 - TỈ LỆ ĐÁP ỨNG BOOKING & VƯỢT TỒN
+    // =========================================================================
+    (function initTool1() {
+      const state = { files: [] };
+      let lastReport = null;
+      let uid = 0;
+
+      const dropzone = document.getElementById('t1-dropzone');
+      const fileInput = document.getElementById('t1-fileInput');
+      const browseBtn = document.getElementById('t1-browseBtn');
+      const filesList = document.getElementById('t1-filesList');
+      const missingHint = document.getElementById('t1-missingHint');
+      const errorBox = document.getElementById('t1-errorBox');
+      const generateBtn = document.getElementById('t1-generateBtn');
+      const resetBtn = document.getElementById('t1-resetBtn');
+      const results = document.getElementById('t1-results');
+      const reportDate = document.getElementById('t1-reportDate');
+
+      reportDate.value = new Date().toISOString().slice(0, 10);
+
+      const ROLE_LABELS_T1 = {
+        booking: '📋 Booking (đơn cần chuyển)',
+        pick: '✅ Pick Tổng (SL Allocate)',
+        stock: '🧊 KFM Stock (Tồn kho)',
+        weight: '⚖️ Bảng trọng lượng N.W (tính Kg)',
+        unknown: '— Không dùng —'
+      };
+      const ID_KEYS = ['barcode', 'code', 'mahang'];
+
+      function normStr(s) {
+        let str = String(s ?? '').toLowerCase();
+        str = str.replace(/đ/g, 'd');
+        str = str.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        return str.trim();
+      }
+      function headerKey(s) { return normStr(s).replace(/[^a-z0-9]/g, ''); }
+      function normBarcode(v) {
+        let s = String(v).trim();
+        if (/^\d+\.0$/.test(s)) s = s.slice(0, -2);
+        return s;
+      }
+      function toNum(v) {
+        if (v === null || v === undefined || v === '') return 0;
+        const n = typeof v === 'number' ? v : parseFloat(String(v).replace(/,/g, '').trim());
+        return isNaN(n) ? 0 : n;
+      }
+
+      function classify(sheets) {
+        const allKeys = new Set();
+        sheets.forEach(s => s.headers.forEach(h => allKeys.add(headerKey(h))));
+        const any = (sub) => [...allKeys].some(k => k.includes(sub));
+        if (allKeys.has('nw')) return 'weight';
+        if (any('cate3')) return 'pick';
+        if (any('expiredate')) return 'stock';
+        if (any('bandau')) return 'booking';
+        return 'unknown';
+      }
+
+      async function parseWb(file) {
+        const buf = await file.arrayBuffer();
+        const wb = XLSX.read(buf, { type: 'array', cellDates: false });
+        const sheets = [];
+        for (const sheetName of wb.SheetNames) {
+          const ws = wb.Sheets[sheetName];
+          const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null, blankrows: false });
+          let headerRowIdx = -1;
+          for (let r = 0; r < Math.min(10, aoa.length); r++) {
+            const row = aoa[r] || [];
+            if (row.some(c => ID_KEYS.includes(headerKey(c)))) { headerRowIdx = r; break; }
+          }
+          if (headerRowIdx === -1) continue;
+          const headers = (aoa[headerRowIdx] || []).map(h => (h == null ? '' : String(h).trim())).filter(h => h !== '');
+          const rows = XLSX.utils.sheet_to_json(ws, { range: headerRowIdx, defval: null });
+          sheets.push({ sheetName, headers, rows });
+        }
+        return sheets;
+      }
+
+      function buildIndex(sheets, type) {
+        const map = new Map();
+        let totalLines = 0, totalQty = 0;
+        for (const sheet of sheets) {
+          const { headers, rows } = sheet;
+          const barcodeCol = headers.find(h => ID_KEYS.includes(headerKey(h)));
+          if (!barcodeCol) continue;
+          const productCol = headers.find(h => headerKey(h).includes('sanpham'));
+          let qtyCol;
+          if (type === 'booking') {
+            qtyCol = headers.find(h => headerKey(h).includes('bandau'));
+          } else {
+            const cands = headers.filter(h => headerKey(h).includes('soluong') || headerKey(h).includes('quantity')).sort((a, b) => a.length - b.length);
+            qtyCol = cands[0];
+          }
+          if (!qtyCol) continue;
+          for (const row of rows) {
+            const bcRaw = row[barcodeCol];
+            if (bcRaw === null || bcRaw === undefined || String(bcRaw).trim() === '') continue;
+            const bc = normBarcode(bcRaw);
+            const qty = toNum(row[qtyCol]);
+            totalLines++; totalQty += qty;
+            const product = row[productCol] != null ? String(row[productCol]).trim() : '';
+            if (!map.has(bc)) map.set(bc, { product, qty: 0 });
+            const e = map.get(bc);
+            e.qty += qty;
+            if (!e.product && product) e.product = product;
+          }
+        }
+        return { map, totalLines, totalQty };
+      }
+
+      function buildWeightMap(sheets) {
+        const map = new Map();
+        for (const sheet of sheets) {
+          const { headers, rows } = sheet;
+          const idCol = headers.find(h => ID_KEYS.includes(headerKey(h)));
+          const nwCol = headers.find(h => headerKey(h) === 'nw');
+          if (!idCol || !nwCol) continue;
+          for (const row of rows) {
+            const bcRaw = row[idCol];
+            if (bcRaw === null || bcRaw === undefined || String(bcRaw).trim() === '') continue;
+            const bc = normBarcode(bcRaw);
+            const nw = toNum(row[nwCol]);
+            if (!map.has(bc)) map.set(bc, nw);
+          }
+        }
+        return map;
+      }
+
+      function effectiveType(f) { return f.overrideType || f.autoType; }
+
+      function showErr(msg) {
+        if (!msg) { errorBox.classList.add('hidden'); errorBox.textContent = ''; }
+        else { errorBox.classList.remove('hidden'); errorBox.textContent = msg; }
+      }
+
+      function autoDetectWave(files) {
+        if (!rawOrders || rawOrders.length === 0 || !files || files.length === 0) return null;
+
+        // 1. Quét tên các file vừa tải lên
+        for (const f of files) {
+          const fnUpper = f.fileName.toUpperCase().replace(/[^A-Z0-9]/g, '');
+          for (const order of rawOrders) {
+            const waveUpper = order.wave.toUpperCase().replace(/[^A-Z0-9]/g, '');
+            const ptUpper = order.pt.toUpperCase().replace(/[^A-Z0-9]/g, '');
+            if (waveUpper && waveUpper.length >= 6 && fnUpper.includes(waveUpper)) return order;
+            if (ptUpper && ptUpper.length >= 5 && fnUpper.includes(ptUpper)) return order;
+          }
+        }
+
+        // 2. Quét ngày đi hàng trong tên file (vd: 020926 hoặc 02.09 hoặc 02_09)
+        for (const f of files) {
+          for (const order of rawOrders) {
+            const parts = order.date.split('/');
+            if (parts.length === 3) {
+              const d = parts[0];
+              const m = parts[1];
+              const y = parts[2].slice(-2);
+              const tag1 = `${d}${m}${y}`;
+              const tag2 = `${d}.${m}`;
+              const tag3 = `${d}_${m}`;
+              if (f.fileName.includes(tag1) || f.fileName.includes(tag2) || f.fileName.includes(tag3)) {
+                // Kiểm tra xem có đơn duy nhất cùng ngày hoặc cùng loại không
+                const sameDateOrders = rawOrders.filter(o => o.date === order.date);
+                if (sameDateOrders.length === 1) return order;
+                // Nếu có nhiều đơn trong ngày, thử so khớp thêm loại đơn (DAILY, NSO, BS, CHAM)
+                const fnUpper = f.fileName.toUpperCase();
+                for (const o of sameDateOrders) {
+                  const typeUpper = (o.type + ' ' + o.wave).toUpperCase();
+                  if (fnUpper.includes('NSO') && typeUpper.includes('NSO')) return o;
+                  if (fnUpper.includes('DAILY') && typeUpper.includes('DAILY')) return o;
+                  if (fnUpper.includes('BS') && typeUpper.includes('BS')) return o;
+                }
+                return sameDateOrders[0];
+              }
+            }
+          }
+        }
+
+        // 3. Quét nội dung sheet để tìm số PT hoặc Tên Wave
+        for (const f of files) {
+          for (const sheet of f.sheets) {
+            for (const row of sheet.rows.slice(0, 15)) {
+              const rowStr = JSON.stringify(row).toUpperCase();
+              for (const order of rawOrders) {
+                if (order.pt && rowStr.includes(order.pt.toUpperCase())) return order;
+                if (order.wave && rowStr.includes(order.wave.toUpperCase())) return order;
+              }
+            }
+          }
+        }
+
+        return null;
+      }
+
+      async function addFiles(fileList) {
+        showErr(null);
+        const arr = Array.from(fileList).filter(f => /\.(xlsx|xls)$/i.test(f.name));
+        for (const file of arr) {
+          try {
+            const sheets = await parseWb(file);
+            if (sheets.length === 0) {
+              showErr(`File "${file.name}" không tìm thấy cột Barcode — bỏ qua.`);
+              continue;
+            }
+            const autoType = classify(sheets);
+            state.files.push({ id: ++uid, fileName: file.name, sheets, autoType, overrideType: null });
+          } catch (err) {
+            showErr(`Không đọc được file "${file.name}": ${err.message}`);
+          }
+        }
+        renderFiles();
+
+        // Tự động nhận diện Tên Wave từ file vừa thả
+        const detectedWave = autoDetectWave(state.files);
+        const badgeEl = document.getElementById('t1AutoDetectBadge');
+        const textEl = document.getElementById('t1AutoDetectText');
+        const selectEl = document.getElementById('t1TargetWaveSelect');
+
+        if (detectedWave) {
+          if (selectEl) selectEl.value = detectedWave.wave;
+          if (badgeEl && textEl) {
+            textEl.innerHTML = `Đã tự động nhận diện Wave: <b class="text-white">${detectedWave.wave}</b> (${detectedWave.pt} - Ngày ${detectedWave.date})`;
+            badgeEl.classList.remove('hidden');
+          }
+        } else {
+          if (badgeEl) badgeEl.classList.add('hidden');
+        }
+      }
+
+      function renderFiles() {
+        filesList.innerHTML = '';
+        state.files.forEach(f => {
+          const row = document.createElement('div');
+          row.className = 'flex items-center justify-between gap-2 p-2.5 bg-slate-900 border border-slate-700 rounded-lg text-xs';
+
+          const nameEl = document.createElement('div');
+          nameEl.className = 'font-semibold text-slate-200 truncate max-w-xs';
+          nameEl.textContent = '📄 ' + f.fileName;
+          row.appendChild(nameEl);
+
+          const select = document.createElement('select');
+          select.className = 'py-1 px-2 rounded bg-slate-800 border border-slate-600 text-xs text-amber-300';
+          ['booking', 'pick', 'stock', 'weight', 'unknown'].forEach(role => {
+            const opt = document.createElement('option');
+            opt.value = role;
+            opt.textContent = ROLE_LABELS_T1[role];
+            if (effectiveType(f) === role) opt.selected = true;
+            select.appendChild(opt);
+          });
+          select.addEventListener('change', () => {
+            f.overrideType = select.value;
+            updateBtn();
+          });
+          row.appendChild(select);
+
+          const removeBtn = document.createElement('button');
+          removeBtn.className = 'text-slate-400 hover:text-rose-400 p-1 font-bold text-sm';
+          removeBtn.innerHTML = '✕';
+          removeBtn.onclick = () => {
+            state.files = state.files.filter(x => x.id !== f.id);
+            renderFiles();
+          };
+          row.appendChild(removeBtn);
+
+          filesList.appendChild(row);
+        });
+
+        updateBtn();
+      }
+
+      function updateBtn() {
+        const roles = { booking: [], pick: [], stock: [] };
+        state.files.forEach(f => {
+          const t = effectiveType(f);
+          if (roles[t]) roles[t].push(f);
+        });
+        const missing = Object.keys(roles).filter(k => roles[k].length === 0);
+
+        if (missing.length > 0) {
+          const labels = { booking: 'Booking', pick: 'Pick Tổng', stock: 'KFM Stock' };
+          missingHint.classList.remove('hidden');
+          missingHint.textContent = 'Còn thiếu: ' + missing.map(m => labels[m]).join(', ') + ' — Hãy nạp đủ file.';
+          generateBtn.disabled = true;
+        } else {
+          missingHint.classList.add('hidden');
+          generateBtn.disabled = false;
+        }
+      }
+
+      // Drag and drop setup
+      if (dropzone && fileInput) {
+        ['dragenter', 'dragover'].forEach(ev => {
+          dropzone.addEventListener(ev, (e) => { e.preventDefault(); dropzone.classList.add('border-amber-500', 'bg-amber-950/20'); });
+        });
+        ['dragleave', 'drop'].forEach(ev => {
+          dropzone.addEventListener(ev, (e) => { e.preventDefault(); dropzone.classList.remove('border-amber-500', 'bg-amber-950/20'); });
+        });
+        dropzone.addEventListener('drop', (e) => { addFiles(e.dataTransfer.files); });
+        dropzone.addEventListener('click', () => fileInput.click());
+        if (browseBtn) browseBtn.addEventListener('click', (e) => { e.stopPropagation(); fileInput.click(); });
+        fileInput.addEventListener('change', () => { addFiles(fileInput.files); fileInput.value = ''; });
+      }
+
+      resetBtn.addEventListener('click', () => {
+        state.files = [];
+        lastReport = null;
+        results.innerHTML = '';
+        showErr(null);
+        renderFiles();
+        const badgeEl = document.getElementById('t1AutoDetectBadge');
+        if (badgeEl) badgeEl.classList.add('hidden');
+      });
+
+      generateBtn.addEventListener('click', () => {
+        try {
+          showErr(null);
+          const bookingFile = state.files.find(f => effectiveType(f) === 'booking');
+          const pickFile = state.files.find(f => effectiveType(f) === 'pick');
+          const stockFile = state.files.find(f => effectiveType(f) === 'stock');
+          const weightFile = state.files.find(f => effectiveType(f) === 'weight');
+
+          if (!bookingFile || !pickFile || !stockFile) {
+            showErr('Thiếu file. Cần đủ Booking + Pick Tổng + KFM Stock.');
+            return;
+          }
+
+          const bkIdx = buildIndex(bookingFile.sheets, 'booking');
+          const pkIdx = buildIndex(pickFile.sheets, 'pick');
+          const stIdx = buildIndex(stockFile.sheets, 'stock');
+          const weightMap = weightFile ? buildWeightMap(weightFile.sheets) : null;
+
+          const rows = [];
+          let sumKgRequested = 0, sumKgAllocate = 0, kgMatchedBarcodes = 0;
+          for (const [barcode, info] of bkIdx.map) {
+            const requested = info.qty;
+            const allocateEntry = pkIdx.map.get(barcode);
+            const allocate = allocateEntry ? allocateEntry.qty : 0;
+            const stockEntry = stIdx.map.get(barcode);
+            const tonkho = stockEntry ? stockEntry.qty : 0;
+            const chenhlech = requested - allocate;
+            const vuotTon = chenhlech > 0;
+            const nw = weightMap ? weightMap.get(barcode) : undefined;
+            const kgRequested = nw !== undefined ? requested * nw : null;
+            const kgAllocate = nw !== undefined ? allocate * nw : null;
+            const kgChenhlech = nw !== undefined && chenhlech > 0 ? chenhlech * nw : null;
+            
+            if (nw !== undefined) {
+              sumKgRequested += kgRequested;
+              sumKgAllocate += kgAllocate;
+              kgMatchedBarcodes++;
+            }
+
+            rows.push({
+              barcode,
+              product: info.product || (allocateEntry && allocateEntry.product) || (stockEntry && stockEntry.product) || '',
+              requested, allocate, tonkho, chenhlech, vuotTon,
+              matched: !!allocateEntry,
+              kgRequested, kgAllocate, kgChenhlech
+            });
+          }
+
+          const distinctBarcodeBooking = rows.length;
+          const matchedBarcodeCount = rows.filter(r => r.matched).length;
+          const ratio1 = distinctBarcodeBooking > 0 ? (matchedBarcodeCount / distinctBarcodeBooking) : 0;
+
+          const totalLines = bkIdx.totalLines;
+          const sumRequested = bkIdx.totalQty;
+          const sumAllocate = rows.reduce((s, r) => s + r.allocate, 0);
+          const sumChenhlech = sumRequested - sumAllocate;
+          const ratio2 = sumRequested > 0 ? (sumAllocate / sumRequested) : 0;
+
+          const detailRows = rows.filter(r => r.vuotTon).sort((a, b) => b.chenhlech - a.chenhlech);
+          const grand = detailRows.reduce((acc, r) => {
+            acc.requested += r.requested; acc.allocate += r.allocate;
+            acc.chenhlech += r.chenhlech; acc.tonkho += r.tonkho;
+            return acc;
+          }, { requested: 0, allocate: 0, chenhlech: 0, tonkho: 0 });
+
+          const weightSummary = weightMap ? {
+            sumKgRequested, sumKgAllocate,
+            matchedBarcodes: kgMatchedBarcodes,
+            totalBarcodes: distinctBarcodeBooking
+          } : null;
+
+          const targetWave = document.getElementById('t1TargetWaveSelect').value;
+
+          lastReport = {
+            dateStr: reportDate.value,
+            targetWave,
+            table1: { distinctBarcodeBooking, matchedBarcodeCount, ratio1 },
+            table2: { totalLines, sumRequested, sumAllocate, sumChenhlech, ratio2 },
+            detailRows, grand, weightSummary
+          };
+
+          // Tự động lưu vào LocalStorage & cập nhật trực tiếp vào Wave của Dashboard!
+          if (targetWave) {
+            const reconPayload = {
+              wave: targetWave,
+              distinctBarcodes: distinctBarcodeBooking,
+              matchedBarcodes: matchedBarcodeCount,
+              barcodeRatio: (ratio1 * 100).toFixed(1) + '%',
+              overStockCount: detailRows.length,
+              overStockQty: grand.chenhlech,
+              sumKgRequested,
+              sumKgAllocate,
+              updatedAt: new Date().toLocaleDateString('vi-VN') + ' ' + new Date().toLocaleTimeString('vi-VN'),
+              items: detailRows
+            };
+            saveReconciliation(targetWave, reconPayload);
+
+            const targetOrder = rawOrders.find(o => o.wave === targetWave);
+            if (targetOrder) targetOrder.reconcile = reconPayload;
+            
+            populateT1WaveSelector();
+            applyFilters();
+          }
+
+          renderReportT1(lastReport);
+
+        } catch (err) {
+          showErr('Có lỗi khi tạo report: ' + err.message);
+        }
+      });
+
+      function renderReportT1(r) {
+        const hasKg = !!r.weightSummary;
+        let waveNotice = '';
+        if (r.targetWave) {
+          waveNotice = `
+            <div class="p-4 bg-gradient-to-r from-emerald-950 via-slate-900 to-slate-900 border border-emerald-500/80 rounded-xl text-xs text-emerald-300 flex flex-wrap items-center justify-between gap-3 shadow-lg">
+              <div class="flex items-center gap-3">
+                <span class="text-2xl">✅</span>
+                <div>
+                  <div class="font-bold text-white text-sm">ĐÃ TỰ ĐỘNG LIÊN KẾT VÀO DASHBOARD</div>
+                  <div class="text-xs text-emerald-300 mt-0.5">Dữ liệu đối chiếu đã được gán trực tiếp vào: <b class="text-white underline">${r.targetWave}</b></div>
+                </div>
+              </div>
+              <button onclick="viewWaveOnDashboard('${r.targetWave}')" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg shadow flex items-center gap-1.5 transition">
+                <span>📊 Mở Xem Ngay Trên Dashboard ➔</span>
+              </button>
+            </div>
+          `;
+        }
+
+        const rowsHtml = r.detailRows.map(row => `
+          <tr class="hover:bg-slate-800/80">
+            <td class="py-2 px-3 text-rose-400 font-semibold">Booking vượt tồn</td>
+            <td class="py-2 px-3 font-mono text-cyan-300">${row.barcode}</td>
+            <td class="py-2 px-3 max-w-xs truncate text-white" title="${row.product}">${row.product}</td>
+            <td class="py-2 px-3 text-right font-mono">${row.requested.toLocaleString()}</td>
+            <td class="py-2 px-3 text-right font-mono text-emerald-400">${row.allocate.toLocaleString()}</td>
+            <td class="py-2 px-3 text-right font-mono font-bold text-rose-400">${row.chenhlech.toLocaleString()}</td>
+            <td class="py-2 px-3 text-right font-mono text-slate-300">${row.tonkho.toLocaleString()}</td>
+            ${hasKg ? `<td class="py-2 px-3 text-right font-mono text-amber-300">${row.kgChenhlech ? row.kgChenhlech.toFixed(1) : '-'}</td>` : ''}
+          </tr>
+        `).join('');
+
+        results.innerHTML = `
+          ${waveNotice}
+          <div class="bg-slate-800/90 border border-slate-700 rounded-xl p-5 shadow-sm space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-700 pb-3">
+              <h3 class="text-sm font-bold text-white">Kết Quả Phân Tích Đáp Ứng Booking</h3>
+              <button onclick="exportTool1Excel()" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition">⬇ Xuất File Excel</button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div class="bg-slate-900/80 p-3.5 rounded-xl border border-slate-700">
+                <div class="text-xs font-bold text-slate-300 mb-2">ĐỘ KHỚP THEO MÃ BARCODE:</div>
+                <div class="flex justify-between text-xs text-slate-300">
+                  <span>Barcode Booking: <b>${r.table1.distinctBarcodeBooking}</b></span>
+                  <span>Allocate: <b>${r.table1.matchedBarcodeCount}</b></span>
+                  <span>Tỉ lệ: <b class="text-amber-400">${(r.table1.ratio1 * 100).toFixed(1)}%</b></span>
+                </div>
+              </div>
+
+              <div class="bg-slate-900/80 p-3.5 rounded-xl border border-slate-700">
+                <div class="text-xs font-bold text-slate-300 mb-2">ĐỘ KHỚP THEO SẢN LƯỢNG:</div>
+                <div class="flex justify-between text-xs text-slate-300">
+                  <span>Tổng Y/C: <b>${r.table2.sumRequested.toLocaleString()}</b></span>
+                  <span>Allocate: <b class="text-emerald-400">${r.table2.sumAllocate.toLocaleString()}</b></span>
+                  <span>Tỉ lệ: <b class="text-amber-400">${(r.table2.ratio2 * 100).toFixed(1)}%</b></span>
+                </div>
+              </div>
+            </div>
+
+            ${hasKg ? `
+              <div class="p-3 bg-slate-900/80 border border-slate-700 rounded-xl flex gap-6 text-xs text-slate-300">
+                <span><b>⚖️ Tổng Kg Yêu Cầu:</b> ${r.weightSummary.sumKgRequested.toLocaleString('vi-VN', { maximumFractionDigits: 1 })} kg</span>
+                <span><b>⚖️ Tổng Kg Allocate:</b> ${r.weightSummary.sumKgAllocate.toLocaleString('vi-VN', { maximumFractionDigits: 1 })} kg</span>
+              </div>
+            ` : ''}
+
+            <div class="space-y-2">
+              <div class="flex items-center justify-between">
+                <h4 class="text-xs font-bold text-rose-400 uppercase">Danh Sách Mã Booking Vượt Tồn Kho (${r.detailRows.length} SKU)</h4>
+              </div>
+
+              ${r.detailRows.length === 0 ? `
+                <div class="text-center py-6 text-emerald-400 font-bold bg-slate-900/60 rounded-xl border border-dashed border-slate-700">
+                  🎉 Toàn bộ mã hàng Booking đều đủ tồn kho!
+                </div>
+              ` : `
+                <div class="overflow-x-auto max-h-72 custom-scrollbar border border-slate-700 rounded-xl">
+                  <table class="w-full text-left text-xs whitespace-nowrap">
+                    <thead class="bg-slate-950 text-slate-300 sticky top-0 border-b border-slate-700">
+                      <tr>
+                        <th class="py-2 px-3">Ghi chú</th>
+                        <th class="py-2 px-3">Barcode</th>
+                        <th class="py-2 px-3">Tên Sản Phẩm</th>
+                        <th class="py-2 px-3 text-right">Y/C Ban Đầu</th>
+                        <th class="py-2 px-3 text-right">Allocate</th>
+                        <th class="py-2 px-3 text-right">Chênh Lệch</th>
+                        <th class="py-2 px-3 text-right">Tồn Kho</th>
+                        ${hasKg ? `<th class="py-2 px-3 text-right">Kg Hụt</th>` : ''}
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-800">${rowsHtml}</tbody>
+                  </table>
+                </div>
+              `}
+            </div>
+          </div>
+        `;
+      }
+
+      window.viewWaveOnDashboard = function(waveName) {
+        switchMainTab('tab-dashboard');
+        const order = rawOrders.find(o => o.wave === waveName);
+        if (order) {
+          openModal(order);
+        }
+      };
+
+      window.exportTool1Excel = function() {
+        if (!lastReport) return;
+        const r = lastReport;
+        const wb = XLSX.utils.book_new();
+        const aoa = [
+          ['BÁO CÁO TỈ LỆ ĐÁP ỨNG BOOKING', r.dateStr],
+          ['Wave:', r.targetWave || 'Toàn bộ'],
+          [],
+          ['Barcode Booking', 'Barcode Allocate', 'Tỉ Lệ Đáp Ứng'],
+          [r.table1.distinctBarcodeBooking, r.table1.matchedBarcodeCount, `${(r.table1.ratio1 * 100).toFixed(1)}%`],
+          [],
+          ['Tổng Lượng Yêu Cầu', 'SL Allocate', 'Chênh Lệch', 'Tỉ Lệ Đáp Ứng'],
+          [r.table2.sumRequested, r.table2.sumAllocate, r.table2.sumChenhlech, `${(r.table2.ratio2 * 100).toFixed(1)}%`],
+          [],
+          ['--- CHI TIẾT SKU VƯỢT TỒN KHO ---'],
+          ['Ghi Chú', 'Barcode', 'Tên Sản Phẩm', 'Số Lượng Y/C Ban Đầu', 'SL Allocate', 'Chênh Lệch', 'Tồn Kho']
+        ];
+
+        r.detailRows.forEach(row => {
+          aoa.push(['Booking vượt tồn', row.barcode, row.product, row.requested, row.allocate, row.chenhlech, row.tonkho]);
+        });
+
+        const ws = XLSX.utils.aoa_to_sheet(aoa);
+        XLSX.utils.book_append_sheet(wb, ws, 'Ti Le Dap Ung');
+        const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+        const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `Bao_Cao_Ti_Le_Dap_Ung_${r.targetWave || 'KFM'}.xlsx`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      };
+
+    })();
+
+    // =========================================================================
+    // CORE LOGIC: TOOL 2 - ĐỐI CHIẾU BOOKING - PICK TỔNG - THỰC CHIA
+    // =========================================================================
+    (function initTool2() {
+      const state = { files: [] };
+      let lastReport = null;
+      let uid = 0;
+
+      const dropzone = document.getElementById('t2-dropzone');
+      const fileInput = document.getElementById('t2-fileInput');
+      const browseBtn = document.getElementById('t2-browseBtn');
+      const filesList = document.getElementById('t2-filesList');
+      const missingHint = document.getElementById('t2-missingHint');
+      const errorBox = document.getElementById('t2-errorBox');
+      const generateBtn = document.getElementById('t2-generateBtn');
+      const resetBtn = document.getElementById('t2-resetBtn');
+      const results = document.getElementById('t2-results');
+
+      const ROLE_LABELS_T2 = {
+        booking: '📋 Booking (SL yêu cầu ban đầu)',
+        pick: '✅ Pick Tổng (SL Pick)',
+        quacanh: '🚚 Chi tiết chia quá cảnh (SL thực chia)',
+        unknown: '— Không dùng —'
+      };
+
+      function normStr(s) {
+        let str = String(s ?? '').toLowerCase();
+        str = str.replace(/đ/g, 'd');
+        str = str.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        return str.trim();
+      }
+      function headerKey(s) { return normStr(s).replace(/[^a-z0-9]/g, ''); }
+      function normBarcode(v) {
+        let s = String(v).trim();
+        if (/^\d+\.0$/.test(s)) s = s.slice(0, -2);
+        return s;
+      }
+      function toNum(v) {
+        if (v === null || v === undefined || v === '') return 0;
+        const n = typeof v === 'number' ? v : parseFloat(String(v).replace(/,/g, '').trim());
+        return isNaN(n) ? 0 : n;
+      }
+
+      function hasKey(sheets, sub) {
+        return sheets.some(s => s.headers.some(h => headerKey(h).includes(sub)));
+      }
+      function fillRatioForKey(sheets, sub) {
+        let total = 0, filled = 0;
+        for (const sheet of sheets) {
+          const col = sheet.headers.find(h => headerKey(h).includes(sub));
+          if (!col) continue;
+          for (const row of sheet.rows) {
+            total++;
+            const v = row[col];
+            if (v !== null && v !== undefined && String(v).trim() !== '') filled++;
+          }
+        }
+        return total > 0 ? filled / total : 0;
+      }
+
+      function classify(sheets) {
+        if (hasKey(sheets, 'cate3')) return 'pick';
+        if (hasKey(sheets, 'bandau')) {
+          const ratio = fillRatioForKey(sheets, 'thucchia');
+          return ratio >= 0.5 ? 'quacanh' : 'booking';
+        }
+        return 'unknown';
+      }
+
+      async function parseWb(file) {
+        const buf = await file.arrayBuffer();
+        const wb = XLSX.read(buf, { type: 'array', cellDates: false });
+        const sheets = [];
+        for (const sheetName of wb.SheetNames) {
+          const ws = wb.Sheets[sheetName];
+          const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null, blankrows: false });
+          let headerRowIdx = -1;
+          for (let r = 0; r < Math.min(10, aoa.length); r++) {
+            const row = aoa[r] || [];
+            if (row.some(c => headerKey(c) === 'barcode')) { headerRowIdx = r; break; }
+          }
+          if (headerRowIdx === -1) continue;
+          const headers = (aoa[headerRowIdx] || []).map(h => (h == null ? '' : String(h).trim())).filter(h => h !== '');
+          const rows = XLSX.utils.sheet_to_json(ws, { range: headerRowIdx, defval: null });
+          sheets.push({ sheetName, headers, rows });
+        }
+        return sheets;
+      }
+
+      function buildIndex(sheets, type) {
+        const map = new Map();
+        for (const sheet of sheets) {
+          const { headers, rows } = sheet;
+          const barcodeCol = headers.find(h => headerKey(h) === 'barcode');
+          if (!barcodeCol) continue;
+          const productCol = headers.find(h => headerKey(h).includes('sanpham'));
+          let qtyCol;
+          if (type === 'booking') {
+            qtyCol = headers.find(h => headerKey(h).includes('bandau'));
+          } else if (type === 'quacanh') {
+            qtyCol = headers.find(h => headerKey(h).includes('thucchia'));
+          } else {
+            const cands = headers.filter(h => headerKey(h).includes('soluong') || headerKey(h).includes('quantity')).sort((a, b) => a.length - b.length);
+            qtyCol = cands[0];
+          }
+          if (!qtyCol) continue;
+          for (const row of rows) {
+            const bcRaw = row[barcodeCol];
+            if (bcRaw === null || bcRaw === undefined || String(bcRaw).trim() === '') continue;
+            const bc = normBarcode(bcRaw);
+            const qty = toNum(row[qtyCol]);
+            const product = productCol && row[productCol] != null ? String(row[productCol]).trim() : '';
+            if (!map.has(bc)) map.set(bc, { product, qty: 0 });
+            const e = map.get(bc);
+            e.qty += qty;
+            if (!e.product && product) e.product = product;
+          }
+        }
+        return map;
+      }
+
+      function effectiveType(f) { return f.overrideType || f.autoType; }
+
+      function showErr(msg) {
+        if (!msg) { errorBox.classList.add('hidden'); errorBox.textContent = ''; }
+        else { errorBox.classList.remove('hidden'); errorBox.textContent = msg; }
+      }
+
+      async function addFiles(fileList) {
+        showErr(null);
+        const arr = Array.from(fileList).filter(f => /\.(xlsx|xls)$/i.test(f.name));
+        for (const file of arr) {
+          try {
+            const sheets = await parseWb(file);
+            if (sheets.length === 0) {
+              showErr(`File "${file.name}" không tìm thấy cột Barcode — bỏ qua.`);
+              continue;
+            }
+            const autoType = classify(sheets);
+            state.files.push({ id: ++uid, fileName: file.name, sheets, autoType, overrideType: null });
+          } catch (err) {
+            showErr(`Không đọc được file "${file.name}": ${err.message}`);
+          }
+        }
+        renderFiles();
+      }
+
+      function renderFiles() {
+        filesList.innerHTML = '';
+        state.files.forEach(f => {
+          const row = document.createElement('div');
+          row.className = 'flex items-center justify-between gap-2 p-2.5 bg-slate-900 border border-slate-700 rounded-lg text-xs';
+
+          const nameEl = document.createElement('div');
+          nameEl.className = 'font-semibold text-slate-200 truncate max-w-xs';
+          nameEl.textContent = '📄 ' + f.fileName;
+          row.appendChild(nameEl);
+
+          const select = document.createElement('select');
+          select.className = 'py-1 px-2 rounded bg-slate-800 border border-slate-600 text-xs text-cyan-300';
+          ['booking', 'pick', 'quacanh', 'unknown'].forEach(role => {
+            const opt = document.createElement('option');
+            opt.value = role;
+            opt.textContent = ROLE_LABELS_T2[role];
+            if (effectiveType(f) === role) opt.selected = true;
+            select.appendChild(opt);
+          });
+          select.addEventListener('change', () => {
+            f.overrideType = select.value;
+            updateBtn();
+          });
+          row.appendChild(select);
+
+          const removeBtn = document.createElement('button');
+          removeBtn.className = 'text-slate-400 hover:text-rose-400 p-1 font-bold text-sm';
+          removeBtn.innerHTML = '✕';
+          removeBtn.onclick = () => {
+            state.files = state.files.filter(x => x.id !== f.id);
+            renderFiles();
+          };
+          row.appendChild(removeBtn);
+
+          filesList.appendChild(row);
+        });
+
+        updateBtn();
+      }
+
+      function updateBtn() {
+        const roles = { booking: [], pick: [], quacanh: [] };
+        state.files.forEach(f => {
+          const t = effectiveType(f);
+          if (roles[t]) roles[t].push(f);
+        });
+        const missing = Object.keys(roles).filter(k => roles[k].length === 0);
+
+        if (missing.length > 0) {
+          const labels = { booking: 'Booking', pick: 'Pick Tổng', quacanh: 'Chi tiết chia quá cảnh' };
+          missingHint.classList.remove('hidden');
+          missingHint.textContent = 'Còn thiếu: ' + missing.map(m => labels[m]).join(', ') + ' — Hãy nạp đủ file.';
+          generateBtn.disabled = true;
+        } else {
+          missingHint.classList.add('hidden');
+          generateBtn.disabled = false;
+        }
+      }
+
+      if (dropzone && fileInput) {
+        ['dragenter', 'dragover'].forEach(ev => {
+          dropzone.addEventListener(ev, (e) => { e.preventDefault(); dropzone.classList.add('border-cyan-500', 'bg-cyan-950/20'); });
+        });
+        ['dragleave', 'drop'].forEach(ev => {
+          dropzone.addEventListener(ev, (e) => { e.preventDefault(); dropzone.classList.remove('border-cyan-500', 'bg-cyan-950/20'); });
+        });
+        dropzone.addEventListener('drop', (e) => { addFiles(e.dataTransfer.files); });
+        dropzone.addEventListener('click', () => fileInput.click());
+        if (browseBtn) browseBtn.addEventListener('click', (e) => { e.stopPropagation(); fileInput.click(); });
+        fileInput.addEventListener('change', () => { addFiles(fileInput.files); fileInput.value = ''; });
+      }
+
+      resetBtn.addEventListener('click', () => {
+        state.files = [];
+        lastReport = null;
+        results.innerHTML = '';
+        showErr(null);
+        renderFiles();
+      });
+
+      generateBtn.addEventListener('click', () => {
+        try {
+          showErr(null);
+          const bookingFiles = state.files.filter(f => effectiveType(f) === 'booking');
+          const pickFiles = state.files.filter(f => effectiveType(f) === 'pick');
+          const quacanhFiles = state.files.filter(f => effectiveType(f) === 'quacanh');
+
+          if (!bookingFiles.length || !pickFiles.length || !quacanhFiles.length) {
+            showErr('Thiếu file. Cần đủ Booking + Pick Tổng + Chi tiết chia quá cảnh.');
+            return;
+          }
+
+          const bookingSheets = bookingFiles.flatMap(f => f.sheets);
+          const pickSheets = pickFiles.flatMap(f => f.sheets);
+          const quacanhSheets = quacanhFiles.flatMap(f => f.sheets);
+
+          const bkMap = buildIndex(bookingSheets, 'booking');
+          const ptMap = buildIndex(pickSheets, 'pick');
+          const tcMap = buildIndex(quacanhSheets, 'quacanh');
+
+          const allBarcodes = new Set([...bkMap.keys(), ...ptMap.keys(), ...tcMap.keys()]);
+          const rows = [];
+          for (const barcode of allBarcodes) {
+            const bk = bkMap.get(barcode);
+            const pt = ptMap.get(barcode);
+            const tc = tcMap.get(barcode);
+            const sumBK = bk ? bk.qty : 0;
+            const sumPT = pt ? pt.qty : 0;
+            const sumTC = tc ? tc.qty : 0;
+            const product = (bk && bk.product) || (tc && tc.product) || (pt && pt.product) || '';
+            const chenhLechBK = sumBK - sumPT;
+            const chenhLechTC = sumPT - sumTC;
+            rows.push({ barcode, product, sumBK, sumPT, sumTC, chenhLechBK, chenhLechTC });
+          }
+          rows.sort((a, b) => (Math.abs(b.chenhLechBK) + Math.abs(b.chenhLechTC)) - (Math.abs(a.chenhLechBK) + Math.abs(a.chenhLechTC)));
+
+          const totalBarcode = rows.length;
+          const lechBKCount = rows.filter(r => r.chenhLechBK !== 0).length;
+          const lechTCCount = rows.filter(r => r.chenhLechTC !== 0).length;
+          const matchCount = rows.filter(r => r.chenhLechBK === 0 && r.chenhLechTC === 0).length;
+
+          lastReport = { rows, totalBarcode, lechBKCount, lechTCCount, matchCount };
+          renderReportT2(lastReport);
+
+        } catch (err) {
+          showErr('Có lỗi khi tạo report: ' + err.message);
+        }
+      });
+
+      function renderReportT2(r) {
+        results.innerHTML = `
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+            <div class="bg-slate-800/90 border border-slate-700 p-4 rounded-xl text-center">
+              <div class="text-2xl font-black text-white">${r.totalBarcode.toLocaleString()}</div>
+              <div class="text-xs text-slate-400 mt-1">Tổng Số Barcode</div>
+            </div>
+            <div class="bg-slate-800/90 border border-slate-700 p-4 rounded-xl text-center">
+              <div class="text-2xl font-black text-rose-400">${r.lechBKCount.toLocaleString()}</div>
+              <div class="text-xs text-slate-400 mt-1">Lệch So Với BK (BK ≠ PT)</div>
+            </div>
+            <div class="bg-slate-800/90 border border-slate-700 p-4 rounded-xl text-center">
+              <div class="text-2xl font-black text-amber-400">${r.lechTCCount.toLocaleString()}</div>
+              <div class="text-xs text-slate-400 mt-1">Lệch Thực Chia (PT ≠ Chia)</div>
+            </div>
+            <div class="bg-slate-800/90 border border-slate-700 p-4 rounded-xl text-center">
+              <div class="text-2xl font-black text-emerald-400">${r.matchCount.toLocaleString()}</div>
+              <div class="text-xs text-slate-400 mt-1">Khớp Hoàn Toàn (100%)</div>
+            </div>
+          </div>
+
+          <div class="bg-slate-800/90 border border-slate-700 rounded-xl p-4 shadow-sm space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div class="flex items-center gap-2 flex-1 max-w-md">
+                <input type="text" id="t2-searchBox" placeholder="Tìm theo Barcode hoặc Tên hàng..." class="w-full py-1.5 px-3 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white" />
+              </div>
+              <div class="flex items-center gap-2">
+                <select id="t2-filterSelect" class="py-1.5 px-3 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white">
+                  <option value="all">Tất cả barcode</option>
+                  <option value="lechbk">Chỉ lệch so với BK</option>
+                  <option value="lechtc">Chỉ lệch so với Pick Tổng</option>
+                  <option value="lechany">Lệch ít nhất 1 loại</option>
+                  <option value="match">Chỉ mã khớp hoàn toàn</option>
+                </select>
+                <button onclick="exportTool2Excel()" class="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-bold transition">⬇ Xuất Excel</button>
+              </div>
+            </div>
+
+            <div id="t2-tableHolder" class="overflow-x-auto max-h-96 custom-scrollbar border border-slate-700 rounded-lg"></div>
+          </div>
+        `;
+
+        document.getElementById('t2-searchBox').addEventListener('input', refreshTableT2);
+        document.getElementById('t2-filterSelect').addEventListener('change', refreshTableT2);
+        refreshTableT2();
+      }
+
+      function refreshTableT2() {
+        if (!lastReport) return;
+        const search = normStr(document.getElementById('t2-searchBox').value);
+        const filter = document.getElementById('t2-filterSelect').value;
+
+        const filtered = lastReport.rows.filter(r => {
+          if (search) {
+            const hay = normStr(r.barcode + ' ' + r.product);
+            if (!hay.includes(search)) return false;
+          }
+          if (filter === 'lechbk' && r.chenhLechBK === 0) return false;
+          if (filter === 'lechtc' && r.chenhLechTC === 0) return false;
+          if (filter === 'lechany' && r.chenhLechBK === 0 && r.chenhLechTC === 0) return false;
+          if (filter === 'match' && (r.chenhLechBK !== 0 || r.chenhLechTC !== 0)) return false;
+          return true;
+        });
+
+        const rowsHtml = filtered.map(r => {
+          let tagHtml = '';
+          if (r.chenhLechBK === 0 && r.chenhLechTC === 0) {
+            tagHtml = '<span class="px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800 text-[10px] font-bold">Khớp</span>';
+          } else {
+            if (r.chenhLechBK !== 0) tagHtml += '<span class="px-1.5 py-0.5 mr-1 rounded bg-rose-950 text-rose-300 border border-rose-800 text-[10px] font-bold">Lệch BK</span>';
+            if (r.chenhLechTC !== 0) tagHtml += '<span class="px-1.5 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800 text-[10px] font-bold">Lệch PT</span>';
+          }
+
+          return `
+            <tr class="hover:bg-slate-800/80">
+              <td class="py-2 px-3 font-mono text-cyan-300">${r.barcode}</td>
+              <td class="py-2 px-3 max-w-xs truncate text-white" title="${r.product}">${r.product}</td>
+              <td class="py-2 px-3 text-right font-mono">${r.sumBK.toLocaleString()}</td>
+              <td class="py-2 px-3 text-right font-mono">${r.sumPT.toLocaleString()}</td>
+              <td class="py-2 px-3 text-right font-mono">${r.sumTC.toLocaleString()}</td>
+              <td class="py-2 px-3 text-right font-mono font-bold ${r.chenhLechBK !== 0 ? 'text-rose-400' : 'text-slate-500'}">${r.chenhLechBK.toLocaleString()}</td>
+              <td class="py-2 px-3 text-right font-mono font-bold ${r.chenhLechTC !== 0 ? 'text-amber-400' : 'text-slate-500'}">${r.chenhLechTC.toLocaleString()}</td>
+              <td class="py-2 px-3 text-center">${tagHtml}</td>
+            </tr>
+          `;
+        }).join('');
+
+        document.getElementById('t2-tableHolder').innerHTML = `
+          <table class="w-full text-left text-xs whitespace-nowrap">
+            <thead class="bg-slate-950 text-slate-300 sticky top-0 border-b border-slate-700">
+              <tr>
+                <th class="py-2 px-3">Barcode</th>
+                <th class="py-2 px-3">Tên Hàng</th>
+                <th class="py-2 px-3 text-right">Sum BK</th>
+                <th class="py-2 px-3 text-right">Sum PT</th>
+                <th class="py-2 px-3 text-right">Sum Thực Chia</th>
+                <th class="py-2 px-3 text-right">Lệch BK (BK-PT)</th>
+                <th class="py-2 px-3 text-right">Lệch Chia (PT-Chia)</th>
+                <th class="py-2 px-3 text-center">Ghi Chú</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800">${rowsHtml}</tbody>
+          </table>
+        `;
+      }
+
+      window.exportTool2Excel = function() {
+        if (!lastReport) return;
+        const wb = XLSX.utils.book_new();
+        const aoa = [['Barcode', 'Tên Hàng', 'Sum BK', 'Sum PT', 'Sum Thực Chia', 'Chênh Lệch BK (BK-PT)', 'Chênh Lệch Thực Chia (PT-Chia)', 'Ghi Chú']];
+        lastReport.rows.forEach(r => {
+          let tag = (r.chenhLechBK === 0 && r.chenhLechTC === 0) ? 'Khớp' : `${r.chenhLechBK !== 0 ? 'Lệch BK' : ''} ${r.chenhLechTC !== 0 ? 'Lệch PT' : ''}`.trim();
+          aoa.push([r.barcode, r.product, r.sumBK, r.sumPT, r.sumTC, r.chenhLechBK, r.chenhLechTC, tag]);
+        });
+        const ws = XLSX.utils.aoa_to_sheet(aoa);
+        XLSX.utils.book_append_sheet(wb, ws, 'Doi Chieu BK PT TC');
+        const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+        const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `Doi_Chieu_Booking_PickTong_ThucChia.xlsx`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      };
+
+    })();
+
+    // =========================================================================
+    // CORE LOGIC: TOOL 3 - KIỂM TRA ĐƠN PUT KỆ
+    // =========================================================================
+    (function initTool3() {
+      const state = { files: [] };
+      let lastReport = null;
+      let pieMode = 'rows';
+      let activeFilter = 'all';
+      let uid = 0;
+
+      const dropzone = document.getElementById('t3-dropzone');
+      const fileInput = document.getElementById('t3-fileInput');
+      const browseBtn = document.getElementById('t3-browseBtn');
+      const filesList = document.getElementById('t3-filesList');
+      const missingHint = document.getElementById('t3-missingHint');
+      const errorBox = document.getElementById('t3-errorBox');
+      const generateBtn = document.getElementById('t3-generateBtn');
+      const resetBtn = document.getElementById('t3-resetBtn');
+      const results = document.getElementById('t3-results');
+
+      const STATUS_META = {
+        'Put đúng': { color: '#10b981', badge: 'bg-emerald-950 text-emerald-300 border-emerald-700' },
+        'Put sai': { color: '#f43f5e', badge: 'bg-rose-950 text-rose-300 border-rose-700' },
+        'Chưa được Put': { color: '#f59e0b', badge: 'bg-amber-950 text-amber-300 border-amber-700' },
+        'Không xác định': { color: '#64748b', badge: 'bg-slate-800 text-slate-400 border-slate-700' }
+      };
+      const STATUS_ORDER = ['Put đúng', 'Put sai', 'Chưa được Put', 'Không xác định'];
+
+      function normStr(s) {
+        let str = String(s ?? '').toLowerCase();
+        str = str.replace(/đ/g, 'd');
+        str = str.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        return str.trim();
+      }
+      function headerKey(s) { return normStr(s).replace(/[^a-z0-9]/g, ''); }
+      function normCode(v) {
+        let s = String(v ?? '').trim();
+        if (/^\d+\.0$/.test(s)) s = s.slice(0, -2);
+        return s.toUpperCase();
+      }
+      function toNum(v) {
+        if (v === null || v === undefined || v === '') return 0;
+        const n = typeof v === 'number' ? v : parseFloat(String(v).replace(/,/g, '').trim());
+        return isNaN(n) ? 0 : n;
+      }
+
+      async function parseWb(file) {
+        const buf = await file.arrayBuffer();
+        const wb = XLSX.read(buf, { type: 'array', cellDates: false });
+        const sheets = [];
+        for (const sheetName of wb.SheetNames) {
+          const ws = wb.Sheets[sheetName];
+          const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null, blankrows: false });
+          if (aoa.length === 0) continue;
+          const headers = (aoa[0] || []).map(h => (h == null ? '' : String(h).trim())).filter(h => h !== '');
+          const rows = XLSX.utils.sheet_to_json(ws, { range: 0, defval: null });
+          sheets.push({ sheetName, headers, rows, aoa });
+        }
+        return sheets;
+      }
+
+      function isMasterSheet(sheet) {
+        const keys = sheet.headers.map(headerKey);
+        return keys.some(k => k.includes('mahang')) && keys.some(k => k.includes('loaihang'));
+      }
+      function isStockSheet(sheet) {
+        const keys = sheet.headers.map(headerKey);
+        return keys.some(k => k === 'barcode') && keys.some(k => k.includes('location') || k.includes('vitri'));
+      }
+
+      function classify(sheets) {
+        if (sheets.some(isMasterSheet)) return 'master';
+        if (sheets.some(isStockSheet)) return 'stock';
+        return 'unknown';
+      }
+
+      function effectiveType(f) { return f.overrideType || f.autoType; }
+
+      function showErr(msg) {
+        if (!msg) { errorBox.classList.add('hidden'); errorBox.textContent = ''; }
+        else { errorBox.classList.remove('hidden'); errorBox.textContent = msg; }
+      }
+
+      async function addFiles(fileList) {
+        showErr(null);
+        const arr = Array.from(fileList).filter(f => /\.(xlsx|xls)$/i.test(f.name));
+        for (const file of arr) {
+          try {
+            const sheets = await parseWb(file);
+            if (sheets.length === 0) {
+              showErr(`File "${file.name}" rỗng — bỏ qua.`);
+              continue;
+            }
+            const autoType = classify(sheets);
+            state.files.push({ id: ++uid, fileName: file.name, sheets, autoType, overrideType: null });
+          } catch (err) {
+            showErr(`Không đọc được file "${file.name}": ${err.message}`);
+          }
+        }
+        renderFiles();
+      }
+
+      function renderFiles() {
+        filesList.innerHTML = '';
+        state.files.forEach(f => {
+          const row = document.createElement('div');
+          row.className = 'flex items-center justify-between gap-2 p-2.5 bg-slate-900 border border-slate-700 rounded-lg text-xs';
+
+          const nameEl = document.createElement('div');
+          nameEl.className = 'font-semibold text-slate-200 truncate max-w-xs';
+          nameEl.textContent = '📄 ' + f.fileName;
+          row.appendChild(nameEl);
+
+          const select = document.createElement('select');
+          select.className = 'py-1 px-2 rounded bg-slate-800 border border-slate-600 text-xs text-emerald-300';
+          [
+            { val: 'master', lbl: '🗂 Master Data (loại hàng + vị trí)' },
+            { val: 'stock', lbl: '📋 File tồn kho cần kiểm tra' },
+            { val: 'unknown', lbl: '— Không dùng —' }
+          ].forEach(role => {
+            const opt = document.createElement('option');
+            opt.value = role.val;
+            opt.textContent = role.lbl;
+            if (effectiveType(f) === role.val) opt.selected = true;
+            select.appendChild(opt);
+          });
+          select.addEventListener('change', () => {
+            f.overrideType = select.value;
+            updateBtn();
+          });
+          row.appendChild(select);
+
+          const removeBtn = document.createElement('button');
+          removeBtn.className = 'text-slate-400 hover:text-rose-400 p-1 font-bold text-sm';
+          removeBtn.innerHTML = '✕';
+          removeBtn.onclick = () => {
+            state.files = state.files.filter(x => x.id !== f.id);
+            renderFiles();
+          };
+          row.appendChild(removeBtn);
+
+          filesList.appendChild(row);
+        });
+
+        updateBtn();
+      }
+
+      function updateBtn() {
+        const roles = { master: [], stock: [] };
+        state.files.forEach(f => {
+          const t = effectiveType(f);
+          if (roles[t]) roles[t].push(f);
+        });
+        const missing = Object.keys(roles).filter(k => roles[k].length === 0);
+
+        if (missing.length > 0) {
+          missingHint.classList.remove('hidden');
+          missingHint.textContent = 'Còn thiếu: ' + missing.map(m => m === 'master' ? 'Master Data' : 'File Tồn Kho').join(', ') + ' — Hãy nạp đủ.';
+          generateBtn.disabled = true;
+        } else {
+          missingHint.classList.add('hidden');
+          generateBtn.disabled = false;
+        }
+      }
+
+      if (dropzone && fileInput) {
+        ['dragenter', 'dragover'].forEach(ev => {
+          dropzone.addEventListener(ev, (e) => { e.preventDefault(); dropzone.classList.add('border-emerald-500', 'bg-emerald-950/20'); });
+        });
+        ['dragleave', 'drop'].forEach(ev => {
+          dropzone.addEventListener(ev, (e) => { e.preventDefault(); dropzone.classList.remove('border-emerald-500', 'bg-emerald-950/20'); });
+        });
+        dropzone.addEventListener('drop', (e) => { addFiles(e.dataTransfer.files); });
+        dropzone.addEventListener('click', () => fileInput.click());
+        if (browseBtn) browseBtn.addEventListener('click', (e) => { e.stopPropagation(); fileInput.click(); });
+        fileInput.addEventListener('change', () => { addFiles(fileInput.files); fileInput.value = ''; });
+      }
+
+      resetBtn.addEventListener('click', () => {
+        state.files = [];
+        lastReport = null;
+        results.innerHTML = '';
+        showErr(null);
+        renderFiles();
+      });
+
+      function buildMaster(files) {
+        const masterMap = new Map();
+        const zoneLocations = new Map();
+        for (const f of files) {
+          for (const sheet of f.sheets) {
+            if (isMasterSheet(sheet)) {
+              const h = sheet.headers;
+              const bcCol = h.find(x => headerKey(x).includes('mahang'));
+              const tenCol = h.find(x => headerKey(x) === 'ten' || headerKey(x).includes('tensanpham'));
+              const loaiCol = h.find(x => headerKey(x).includes('loaihang'));
+              for (const row of sheet.rows) {
+                const bcRaw = row[bcCol];
+                if (bcRaw === null || bcRaw === undefined || String(bcRaw).trim() === '') continue;
+                const bc = normCode(bcRaw);
+                masterMap.set(bc, {
+                  ten: tenCol && row[tenCol] != null ? String(row[tenCol]).trim() : '',
+                  loai: loaiCol && row[loaiCol] != null ? String(row[loaiCol]).trim().toUpperCase() : ''
+                });
+              }
+            } else {
+              const zoneName = sheet.sheetName.trim().toUpperCase();
+              if (!zoneLocations.has(zoneName)) zoneLocations.set(zoneName, new Set());
+              const set = zoneLocations.get(zoneName);
+              for (const row of sheet.aoa.slice(1)) {
+                const v = row && row[0];
+                if (v !== null && v !== undefined && String(v).trim() !== '') set.add(normCode(v));
+              }
+            }
+          }
+        }
+
+        const zonePatterns = [];
+        for (const [zone, set] of zoneLocations) {
+          const letterCounts = {};
+          for (const loc of set) {
+            const m = loc.match(/^([A-Z]+)/);
+            if (m) { const letter = m[1][0]; letterCounts[letter] = (letterCounts[letter] || 0) + 1; }
+          }
+          let bestLetter = null, bestCount = 0;
+          for (const letter in letterCounts) {
+            if (letterCounts[letter] > bestCount) { bestCount = letterCounts[letter]; bestLetter = letter; }
+          }
+          if (bestLetter) {
+            zonePatterns.push({ zone, regex: new RegExp('^' + bestLetter + '\\d+(\\.\\d+)+[A-Z]*$') });
+          }
+        }
+        return { masterMap, zoneLocations, zonePatterns };
+      }
+
+      function zoneOfPattern(patterns, loc) {
+        for (const zp of patterns) {
+          if (zp.regex.test(loc)) return zp.zone;
+        }
+        return null;
+      }
+
+      function buildStockRows(files) {
+        const rows = [];
+        for (const f of files) {
+          for (const sheet of f.sheets) {
+            if (!isStockSheet(sheet)) continue;
+            const h = sheet.headers;
+            const bcCol = h.find(x => headerKey(x) === 'barcode');
+            const locCol = h.find(x => headerKey(x).includes('location') || headerKey(x).includes('vitri'));
+            const prodCol = h.find(x => headerKey(x).includes('sanpham'));
+            const qtyCands = h.filter(x => headerKey(x).includes('soluong') || headerKey(x).includes('quantity')).sort((a,b)=>a.length-b.length);
+            const qtyCol = qtyCands[0];
+            for (const row of sheet.rows) {
+              const bcRaw = row[bcCol];
+              if (bcRaw === null || bcRaw === undefined || String(bcRaw).trim() === '') continue;
+              rows.push({
+                barcode: normCode(bcRaw),
+                location: locCol ? normCode(row[locCol]) : '',
+                product: prodCol && row[prodCol] != null ? String(row[prodCol]).trim() : '',
+                qty: qtyCol ? toNum(row[qtyCol]) : 0
+              });
+            }
+          }
+        }
+        return rows;
+      }
+
+      generateBtn.addEventListener('click', () => {
+        try {
+          showErr(null);
+          const masterFiles = state.files.filter(f => effectiveType(f) === 'master');
+          const stockFiles = state.files.filter(f => effectiveType(f) === 'stock');
+
+          if (!masterFiles.length || !stockFiles.length) {
+            showErr('Thiếu file. Cần đủ Master Data + File tồn kho.');
+            return;
+          }
+
+          const { masterMap, zoneLocations, zonePatterns } = buildMaster(masterFiles);
+          const stockRows = buildStockRows(stockFiles);
+          const detailRows = [];
+
+          for (const sr of stockRows) {
+            const m = masterMap.get(sr.barcode);
+            const actualZone = zoneOfPattern(zonePatterns, sr.location);
+            let status;
+            if (!m) status = 'Không xác định';
+            else if (!actualZone) status = 'Chưa được Put';
+            else if (actualZone === m.loai) status = 'Put đúng';
+            else status = 'Put sai';
+
+            detailRows.push({
+              location: sr.location,
+              barcode: sr.barcode,
+              product: (m && m.ten) || sr.product || '',
+              expectedZone: m ? m.loai : '',
+              actualZone: actualZone || (status === 'Chưa được Put' ? '— (chờ put)' : ''),
+              status,
+              qty: sr.qty
+            });
+          }
+
+          const zoneList = [...zoneLocations.entries()].map(([name, set]) => ({ name, count: set.size }));
+
+          lastReport = {
+            detailRows,
+            masterSkuCount: masterMap.size,
+            zoneList,
+            generatedAt: new Date()
+          };
+
+          pieMode = 'rows';
+          activeFilter = 'all';
+          renderReportT3(lastReport);
+
+        } catch (err) {
+          showErr('Có lỗi khi kiểm tra đơn Put: ' + err.message);
+        }
+      });
+
+      function renderReportT3(r) {
+        results.innerHTML = `
+          <div class="bg-slate-800/90 border border-slate-700 p-4 rounded-xl flex gap-6 text-xs text-slate-300 flex-wrap">
+            <span>Tổng mã Master Data: <b>${r.masterSkuCount.toLocaleString()}</b></span>
+            ${r.zoneList.map(z => `<span>Khu <b>${z.name}</b>: <b>${z.count.toLocaleString()}</b> vị trí</span>`).join('')}
+          </div>
+
+          <div id="t3-kpiHolder" class="grid grid-cols-2 sm:grid-cols-4 gap-3.5"></div>
+
+          <div class="bg-slate-800/90 border border-slate-700 p-5 rounded-xl space-y-4">
+            <div id="t3-pieHolder"></div>
+          </div>
+
+          <div class="bg-slate-800/90 border border-slate-700 rounded-xl p-4 shadow-sm space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <input type="text" id="t3-searchBox" placeholder="Tìm Barcode, Tên hàng, Vị trí..." class="py-1.5 px-3 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white max-w-xs" />
+              <div class="flex items-center gap-1.5 flex-wrap" id="t3-filterPills"></div>
+              <button onclick="exportTool3Excel()" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition">⬇ Xuất Excel</button>
+            </div>
+
+            <div id="t3-tableHolder" class="overflow-x-auto max-h-96 custom-scrollbar border border-slate-700 rounded-lg"></div>
+          </div>
+        `;
+
+        document.getElementById('t3-searchBox').addEventListener('input', refreshTableT3);
+        renderPillsAndKpiT3();
+        refreshTableT3();
+      }
+
+      function computeStats(rows, mode) {
+        const stats = {};
+        STATUS_ORDER.forEach(s => stats[s] = 0);
+        let total = 0;
+        rows.forEach(r => {
+          const v = mode === 'qty' ? (r.qty || 0) : 1;
+          stats[r.status] = (stats[r.status] || 0) + v;
+          total += v;
+        });
+        return { stats, total };
+      }
+
+      function renderPillsAndKpiT3() {
+        if (!lastReport) return;
+        const { stats, total } = computeStats(lastReport.detailRows, pieMode);
+
+        const kpiHtml = STATUS_ORDER.map(s => {
+          const v = stats[s] || 0;
+          const pct = total > 0 ? ((v / total) * 100).toFixed(1) : 0;
+          const meta = STATUS_META[s];
+          return `
+            <div class="bg-slate-800/90 border border-slate-700 p-4 rounded-xl text-center">
+              <div class="text-2xl font-black" style="color:${meta.color}">${v.toLocaleString()}</div>
+              <div class="text-xs text-slate-400 mt-1">${s} (${pct}%)</div>
+            </div>
+          `;
+        }).join('');
+        document.getElementById('t3-kpiHolder').innerHTML = kpiHtml;
+
+        // Pie Chart Conic
+        let acc = 0;
+        const parts = [];
+        STATUS_ORDER.forEach(s => {
+          const v = stats[s] || 0;
+          if (v <= 0) return;
+          const start = total > 0 ? (acc / total) * 360 : 0;
+          acc += v;
+          const end = total > 0 ? (acc / total) * 360 : 0;
+          parts.push(`${STATUS_META[s].color} ${start}deg ${end}deg`);
+        });
+        const gradient = parts.length === 0 ? 'conic-gradient(#334155 0deg 360deg)' : `conic-gradient(${parts.join(', ')})`;
+
+        document.getElementById('t3-pieHolder').innerHTML = `
+          <div class="flex items-center justify-between pb-2 border-b border-slate-700/60">
+            <h3 class="text-sm font-bold text-white">Tỉ Lệ Put Theo Trạng Thái</h3>
+            <div class="bg-slate-900 p-0.5 rounded-lg border border-slate-700 flex text-xs">
+              <button onclick="setT3PieMode('rows')" class="px-2.5 py-1 rounded ${pieMode === 'rows' ? 'bg-emerald-600 text-white font-bold' : 'text-slate-400'}">Theo Số Dòng</button>
+              <button onclick="setT3PieMode('qty')" class="px-2.5 py-1 rounded ${pieMode === 'qty' ? 'bg-emerald-600 text-white font-bold' : 'text-slate-400'}">Theo Số Lượng</button>
+            </div>
+          </div>
+          <div class="flex items-center justify-center gap-8 pt-3 flex-wrap">
+            <div class="w-36 h-36 rounded-full shadow-lg border border-slate-700" style="background:${gradient}"></div>
+            <div class="space-y-2 text-xs">
+              ${STATUS_ORDER.map(s => {
+                const v = stats[s] || 0;
+                const pct = total > 0 ? ((v / total) * 100).toFixed(1) : 0;
+                return `
+                  <div class="flex items-center gap-2">
+                    <span class="w-3 h-3 rounded" style="background:${STATUS_META[s].color}"></span>
+                    <span class="text-slate-300 w-28">${s}:</span>
+                    <span class="font-bold text-white">${v.toLocaleString()} (${pct}%)</span>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `;
+
+        const pillsHtml = ['<button onclick="setT3Filter(\'all\')" class="px-2.5 py-1 rounded-full text-xs font-semibold ' + (activeFilter === 'all' ? 'bg-emerald-600 text-white' : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-700') + '">Tất cả</button>'];
+        STATUS_ORDER.forEach(s => {
+          pillsHtml.push(`<button onclick="setT3Filter('${s}')" class="px-2.5 py-1 rounded-full text-xs font-semibold ${activeFilter === s ? 'bg-emerald-600 text-white' : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-700'}">${s}</button>`);
+        });
+        document.getElementById('t3-filterPills').innerHTML = pillsHtml.join('');
+      }
+
+      window.setT3PieMode = function(mode) {
+        pieMode = mode;
+        renderPillsAndKpiT3();
+      };
+
+      window.setT3Filter = function(filter) {
+        activeFilter = filter;
+        renderPillsAndKpiT3();
+        refreshTableT3();
+      };
+
+      function refreshTableT3() {
+        if (!lastReport) return;
+        const search = normStr(document.getElementById('t3-searchBox').value);
+
+        const filtered = lastReport.detailRows.filter(r => {
+          if (activeFilter !== 'all' && r.status !== activeFilter) return false;
+          if (search) {
+            const hay = normStr(r.barcode + ' ' + r.product + ' ' + r.location);
+            if (!hay.includes(search)) return false;
+          }
+          return true;
+        });
+
+        const rowsHtml = filtered.slice(0, 1500).map(r => {
+          const meta = STATUS_META[r.status];
+          return `
+            <tr class="hover:bg-slate-800/80">
+              <td class="py-2 px-3 font-mono font-bold text-cyan-300">${r.location}</td>
+              <td class="py-2 px-3 font-mono">${r.barcode}</td>
+              <td class="py-2 px-3 max-w-xs truncate text-white" title="${r.product}">${r.product}</td>
+              <td class="py-2 px-3 text-slate-300">${r.expectedZone}</td>
+              <td class="py-2 px-3 text-slate-300">${r.actualZone}</td>
+              <td class="py-2 px-3"><span class="px-2 py-0.5 rounded-full text-[10px] font-bold border ${meta.badge}">${r.status}</span></td>
+              <td class="py-2 px-3 text-right font-mono">${r.qty ? r.qty.toLocaleString() : ''}</td>
+            </tr>
+          `;
+        }).join('');
+
+        document.getElementById('t3-tableHolder').innerHTML = `
+          <table class="w-full text-left text-xs whitespace-nowrap">
+            <thead class="bg-slate-950 text-slate-300 sticky top-0 border-b border-slate-700">
+              <tr>
+                <th class="py-2 px-3">Vị Trí Kệ</th>
+                <th class="py-2 px-3">Mã Hàng</th>
+                <th class="py-2 px-3">Tên Sản Phẩm</th>
+                <th class="py-2 px-3">Loại Hàng Master</th>
+                <th class="py-2 px-3">Khu Vực Hiện Tại</th>
+                <th class="py-2 px-3">Trạng Thái</th>
+                <th class="py-2 px-3 text-right">Số Lượng</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800">${rowsHtml}</tbody>
+          </table>
+        `;
+      }
+
+      window.exportTool3Excel = function() {
+        if (!lastReport) return;
+        const wb = XLSX.utils.book_new();
+        const aoa = [['Vị Trí Kệ', 'Mã Hàng', 'Tên Sản Phẩm', 'Loại Hàng Master', 'Khu Vực Hiện Tại', 'Trạng Thái', 'Số Lượng']];
+        lastReport.detailRows.forEach(r => {
+          aoa.push([r.location, r.barcode, r.product, r.expectedZone, r.actualZone, r.status, r.qty]);
+        });
+        const ws = XLSX.utils.aoa_to_sheet(aoa);
+        XLSX.utils.book_append_sheet(wb, ws, 'Kiem Tra Don Put');
+        const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+        const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `Kiem_Tra_Don_Put_Kho_Dong.xlsx`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      };
+
+    })();
+
+    // ---------- GLOBAL INITIALIZATION ----------
+    window.addEventListener('DOMContentLoaded', () => {
+      fetchLiveSheet();
+      autoRefreshTimer = setInterval(fetchLiveSheet, 60000);
+    });
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeModal();
+    });
+  </script>
+</body>
+</html>
