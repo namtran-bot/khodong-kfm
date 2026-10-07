@@ -167,10 +167,16 @@
 
       <!-- Global Actions -->
       <div class="flex items-center gap-2 text-xs">
-        <button onclick="openShareModal()" class="px-3 py-1.5 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-slate-950 font-bold rounded-lg border border-amber-400 flex items-center gap-1.5 shadow-lg shadow-amber-500/20 transition cursor-pointer" title="Tạo link chia sẻ dữ liệu đối chiếu vượt tồn cho đồng nghiệp">
+        <button onclick="openCloudModal()" class="px-3 py-1.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold rounded-lg border border-cyan-400/50 flex items-center gap-1.5 shadow-lg shadow-cyan-500/20 transition cursor-pointer" title="Đồng bộ dữ liệu đối chiếu lên Cloud cho tất cả mọi người cùng xem">
+          <span class="animate-pulse">☁️</span>
+          <span class="hidden sm:inline">Đồng Bộ Cloud</span>
+          <span id="cloudStatusDot" class="w-2 h-2 rounded-full bg-emerald-400"></span>
+        </button>
+
+        <button onclick="openShareModal()" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-300 font-semibold rounded-lg border border-slate-700 flex items-center gap-1.5 transition cursor-pointer" title="Tạo link chia sẻ nhanh">
           <span>🔗</span>
-          <span class="hidden sm:inline">Chia Sẻ Dữ Liệu</span>
-          <span id="headerReconCountBadge" class="hidden px-1.5 py-0.2 text-[10px] font-black rounded-full bg-slate-950 text-amber-300">0</span>
+          <span class="hidden md:inline">Chia Sẻ Link</span>
+          <span id="headerReconCountBadge" class="hidden px-1.5 py-0.2 text-[10px] font-black rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40">0</span>
         </button>
 
         <div class="hidden sm:flex items-center gap-2 bg-slate-800/80 px-2.5 py-1.5 rounded-lg border border-slate-700">
@@ -837,6 +843,105 @@
       </div>
     </div>
 
+    <!-- ========================================================================= -->
+    <!-- POPUP MODAL: ĐỒNG BỘ CLOUD TOÀN HỆ THỐNG (SHARED CLOUD RECONCILIATION)     -->
+    <!-- ========================================================================= -->
+    <div id="cloudModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden no-print">
+      <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto custom-scrollbar">
+        
+        <!-- Modal Header -->
+        <div class="flex items-center justify-between border-b border-slate-700 pb-3">
+          <div class="flex items-center gap-2.5">
+            <div class="w-9 h-9 rounded-xl bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center text-cyan-300 font-bold text-lg">
+              ☁️
+            </div>
+            <div>
+              <h3 class="text-base font-bold text-white">Đồng Bộ Cloud Toàn Hệ Thống (Shared Database)</h3>
+              <p class="text-xs text-slate-400">Tự động đồng bộ kết quả đối chiếu vượt tồn cho tất cả đối tác khi mở web</p>
+            </div>
+          </div>
+          <button onclick="closeCloudModal()" class="w-8 h-8 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 flex items-center justify-center transition">✕</button>
+        </div>
+
+        <!-- Section 1: Trạng Thái Đồng Bộ -->
+        <div class="bg-gradient-to-r from-blue-950/40 via-slate-900 to-slate-900 border border-cyan-500/40 rounded-xl p-4 space-y-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 pulse-dot"></span>
+              <span class="text-xs font-bold text-emerald-300 uppercase tracking-wide">Trạng Thái Cloud: Tự Động Kết Nối</span>
+            </div>
+            <span id="cloudLastSyncTime" class="text-[11px] text-slate-400">Đồng bộ: Vừa xong</span>
+          </div>
+
+          <p class="text-xs text-slate-300 leading-relaxed">
+            Mỗi khi bạn nạp file đối chiếu (Tool 1), hệ thống sẽ <b>tự động đẩy lên Cloud</b>. Bất kỳ ai mở link web cố định cũng sẽ <b>tự động tải dữ liệu đối chiếu mới nhất về xem ngay mà không cần bạn phải gửi lại link</b>!
+          </p>
+
+          <div class="flex flex-wrap items-center gap-2 pt-1">
+            <button onclick="pushCloudReconciliations(true)" id="btnPushCloud" class="px-4 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 shadow-lg shadow-cyan-500/20 transition cursor-pointer">
+              <span>☁️ Đẩy Lên Cloud Ngay (Push)</span>
+            </button>
+            <button onclick="pullCloudReconciliations(true)" id="btnPullCloud" class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-600 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer">
+              <span>🔄 Tải Mới Từ Cloud (Pull)</span>
+            </button>
+            <span id="cloudActionStatus" class="text-xs font-semibold text-emerald-400 ml-auto"></span>
+          </div>
+        </div>
+
+        <!-- Section 2: Cài Đặt Endpoint (Tùy Chọn Google Apps Script / Custom API) -->
+        <div class="bg-slate-900/70 border border-slate-700 rounded-xl p-4 space-y-3">
+          <div class="flex items-center justify-between">
+            <div class="text-xs font-bold text-slate-300 uppercase tracking-wide flex items-center gap-1.5">
+              <span>⚙️</span>
+              <span>Cấu Hình Đường Dẫn Cloud API (Tùy Chọn)</span>
+            </div>
+            <span class="text-[10px] text-cyan-400 font-mono">Google Apps Script Web App</span>
+          </div>
+
+          <p class="text-[11px] text-slate-400">
+            Hệ thống hỗ trợ kết nối trực tiếp với <b>Google Apps Script</b> gắn trên Google Sheets của bạn để lưu trữ vĩnh viễn và bảo mật:
+          </p>
+
+          <div class="space-y-1.5">
+            <label class="block text-[11px] text-slate-400 font-medium">Đường Dẫn Web App (Google Apps Script / Cloud API URL):</label>
+            <div class="flex gap-2">
+              <input type="url" id="cloudApiUrlInput" class="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-cyan-500" placeholder="https://script.google.com/macros/s/.../exec">
+              <button onclick="saveCloudApiUrl()" class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-lg text-xs border border-slate-600 transition cursor-pointer">
+                Lưu URL
+              </button>
+            </div>
+          </div>
+
+          <details class="text-xs text-slate-400 bg-slate-950/60 p-3 rounded-lg border border-slate-800">
+            <summary class="cursor-pointer font-bold text-cyan-300 hover:text-cyan-200 select-none">
+              👉 Cách tạo Google Sheet Web App riêng trong 1 phút (Bấm để xem hướng dẫn)
+            </summary>
+            <div class="mt-2 space-y-2 text-[11px] text-slate-300 pl-2 border-l border-cyan-500/40">
+              <p>1. Mở một Google Sheet mới $\rightarrow$ Vào menu <b>Tiện ích mở rộng (Extensions)</b> $\rightarrow$ <b>Apps Script</b>.</p>
+              <p>2. Dán đoạn mã sau vào rồi bấm <b>Triển khai (Deploy) $\rightarrow$ Tùy chọn triển khai mới (New deployment)</b>:</p>
+              <pre class="bg-slate-900 p-2 rounded text-amber-300 font-mono text-[10px] overflow-x-auto select-all">
+function doGet(e) {
+  var data = PropertiesService.getScriptProperties().getProperty('KFM_RECON') || '{}';
+  return ContentService.createTextOutput(data).setMimeType(ContentService.MimeType.JSON);
+}
+function doPost(e) {
+  var data = e.postData.contents;
+  PropertiesService.getScriptProperties().setProperty('KFM_RECON', data);
+  return ContentService.createTextOutput(JSON.stringify({status:'ok'})).setMimeType(ContentService.MimeType.JSON);
+}
+              </pre>
+              <p>3. Chọn quyền truy cập: <b>Bất kỳ ai (Anyone)</b> $\rightarrow$ Bấm Deploy $\rightarrow$ Sao chép đường link <b>Web App URL</b> dán vào ô bên trên $\rightarrow$ Bấm <b>Lưu URL</b> là xong!</p>
+            </div>
+          </details>
+        </div>
+
+        <!-- Footer -->
+        <div class="pt-2 flex justify-end">
+          <button onclick="closeCloudModal()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-xs font-semibold">Đóng</button>
+        </div>
+      </div>
+    </div>
+
   </main>
 
   <script>
@@ -1088,6 +1193,9 @@
       syncStatus.innerHTML = '<span class="text-amber-300">Đang đồng bộ...</span>';
 
       try {
+        // Tải dữ liệu đối chiếu từ Cloud song song với Google Sheets
+        pullCloudReconciliations(false);
+
         const response = await fetch(CSV_URL + '&t=' + Date.now(), { cache: 'no-store' });
         if (!response.ok) throw new Error('HTTP ' + response.status);
         const text = await response.text();
@@ -1989,8 +2097,148 @@
         const key = getStorageKey(waveName);
         localStorage.setItem(key, JSON.stringify(data));
         updateHeaderReconBadge();
+        // Tự động đẩy lên Cloud nếu có cấu hình
+        pushCloudReconciliations(false);
       } catch (e) {
         console.warn('LocalStorage save failed', e);
+      }
+    }
+
+    // ---------- CLOUD SYNC ENGINE (GOOGLE APPS SCRIPT / CLOUD API) ----------
+    const CLOUD_STORAGE_KEY = 'kfm_cloud_api_url';
+
+    function getCloudApiUrl() {
+      return (localStorage.getItem(CLOUD_STORAGE_KEY) || '').trim();
+    }
+
+    function saveCloudApiUrl() {
+      const input = document.getElementById('cloudApiUrlInput');
+      if (!input) return;
+      const url = input.value.trim();
+      if (url) {
+        localStorage.setItem(CLOUD_STORAGE_KEY, url);
+        alert('✅ Đã lưu cấu hình Cloud API URL thành công!\n\nHệ thống sẽ tiến hành tải và đồng bộ dữ liệu ngay.');
+        pullCloudReconciliations(true);
+      } else {
+        localStorage.removeItem(CLOUD_STORAGE_KEY);
+        alert('Đã xoá cấu hình Cloud API URL.');
+      }
+    }
+
+    function openCloudModal() {
+      const input = document.getElementById('cloudApiUrlInput');
+      if (input) input.value = getCloudApiUrl();
+      document.getElementById('cloudModal').classList.remove('hidden');
+    }
+
+    function closeCloudModal() {
+      document.getElementById('cloudModal').classList.add('hidden');
+    }
+
+    async function pushCloudReconciliations(isManual = false) {
+      const url = getCloudApiUrl();
+      const statusEl = document.getElementById('cloudActionStatus');
+      const lastSyncEl = document.getElementById('cloudLastSyncTime');
+      const dot = document.getElementById('cloudStatusDot');
+
+      const allData = getAllReconciliations();
+      const count = Object.keys(allData).length;
+
+      if (!url) {
+        if (isManual) {
+          alert('💡 Bạn chưa điền URL Google Apps Script Web App.\n\nVui lòng làm theo hướng dẫn 3 bước trong bảng cài đặt Cloud để tạo link Web App và dán vào nhé!');
+        }
+        return;
+      }
+
+      if (statusEl) statusEl.innerText = 'Đang đẩy lên Cloud...';
+
+      try {
+        const payload = {
+          app: 'KFM_FROZEN_WMS',
+          updatedAt: new Date().toISOString(),
+          data: allData
+        };
+
+        await fetch(url, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(payload)
+        });
+
+        if (statusEl) statusEl.innerText = '✅ Đã gửi lên Cloud thành công!';
+        if (lastSyncEl) lastSyncEl.innerText = 'Đồng bộ: ' + new Date().toLocaleTimeString('vi-VN');
+        if (dot) dot.className = 'w-2 h-2 rounded-full bg-emerald-400';
+
+        if (isManual) {
+          alert(`🎉 Đã đồng bộ thành công ${count} Wave lên Cloud!\n\nBất kỳ ai mở link web cố định hoặc F5 lại đều sẽ tự động thấy ngay dữ liệu này.`);
+        }
+      } catch (err) {
+        console.warn('Push to cloud error:', err);
+        if (statusEl) statusEl.innerText = '⚠️ Lỗi đẩy lên Cloud: ' + err.message;
+        if (dot) dot.className = 'w-2 h-2 rounded-full bg-amber-400';
+        if (isManual) alert('Lỗi khi gửi lên Cloud: ' + err.message);
+      }
+    }
+
+    async function pullCloudReconciliations(isManual = false) {
+      const url = getCloudApiUrl();
+      const statusEl = document.getElementById('cloudActionStatus');
+      const lastSyncEl = document.getElementById('cloudLastSyncTime');
+      const dot = document.getElementById('cloudStatusDot');
+
+      if (!url) {
+        if (isManual) {
+          alert('💡 Bạn chưa điền URL Google Apps Script Web App trong ô bên dưới.');
+        }
+        return;
+      }
+
+      if (statusEl) statusEl.innerText = 'Đang tải từ Cloud...';
+
+      try {
+        const fetchUrl = url + (url.includes('?') ? '&' : '?') + 't=' + Date.now();
+        const resp = await fetch(fetchUrl);
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const text = await resp.text();
+        if (!text || text.trim().length === 0) return;
+
+        const payload = JSON.parse(text);
+        const data = payload.data || payload;
+        let syncedCount = 0;
+
+        Object.keys(data).forEach(key => {
+          if (key.startsWith('kfm_recon_')) {
+            localStorage.setItem(key, JSON.stringify(data[key]));
+            syncedCount++;
+          } else if (data[key] && data[key].wave) {
+            const storageKey = getStorageKey(data[key].wave);
+            localStorage.setItem(storageKey, JSON.stringify(data[key]));
+            syncedCount++;
+          }
+        });
+
+        if (syncedCount > 0) {
+          rawOrders.forEach(o => {
+            o.reconcile = getSavedReconciliation(o.wave, o.pt);
+          });
+          populateT1WaveSelector();
+          applyFilters();
+          updateHeaderReconBadge();
+          if (lastSyncEl) lastSyncEl.innerText = 'Đồng bộ: ' + new Date().toLocaleTimeString('vi-VN');
+          if (dot) dot.className = 'w-2 h-2 rounded-full bg-emerald-400';
+          if (statusEl) statusEl.innerText = `✅ Đã tải ${syncedCount} Wave từ Cloud!`;
+
+          if (isManual) {
+            alert(`✅ Đã tải thành công ${syncedCount} Wave đối chiếu từ Cloud về máy!`);
+          }
+        }
+      } catch (err) {
+        console.warn('Pull from cloud failed:', err);
+        if (dot) dot.className = 'w-2 h-2 rounded-full bg-slate-500';
+        if (statusEl) statusEl.innerText = 'Chưa tải được từ Cloud';
+        if (isManual) alert('Không thể tải từ Cloud: ' + err.message);
       }
     }
 
