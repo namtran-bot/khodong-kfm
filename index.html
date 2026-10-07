@@ -9,6 +9,8 @@
   <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
   <!-- SheetJS for Full Excel Processing -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <!-- LZString for URL State Compression & Instant Sharing -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.5.0/lz-string.min.js"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
     body {
@@ -76,6 +78,16 @@
   </style>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen">
+
+  <!-- Auto-Sync Toast Notification Banner (Shown when opened from a share link) -->
+  <div id="syncToastBanner" class="hidden fixed top-5 right-5 z-50 max-w-md bg-gradient-to-r from-emerald-950 via-slate-900 to-slate-900 border-2 border-emerald-500 rounded-2xl p-4 shadow-2xl text-white flex items-start gap-3 transition-all duration-500 no-print">
+    <div class="text-2xl animate-bounce">🎉</div>
+    <div class="flex-1 text-xs">
+      <div class="font-bold text-sm text-emerald-300" id="syncToastTitle">ĐÃ ĐỒNG BỘ DỮ LIỆU ĐỐI CHIẾU!</div>
+      <div class="text-slate-200 mt-1" id="syncToastDesc">Đã tự động tải thành công dữ liệu đối chiếu vượt tồn từ liên kết được chia sẻ.</div>
+    </div>
+    <button onclick="document.getElementById('syncToastBanner').classList.add('hidden')" class="text-slate-400 hover:text-white font-bold text-sm p-1">✕</button>
+  </div>
 
   <!-- Printable Header -->
   <div class="print-only p-6 border-b-2 border-slate-800 mb-4">
@@ -155,6 +167,12 @@
 
       <!-- Global Actions -->
       <div class="flex items-center gap-2 text-xs">
+        <button onclick="openShareModal()" class="px-3 py-1.5 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-slate-950 font-bold rounded-lg border border-amber-400 flex items-center gap-1.5 shadow-lg shadow-amber-500/20 transition cursor-pointer" title="Tạo link chia sẻ dữ liệu đối chiếu vượt tồn cho đồng nghiệp">
+          <span>🔗</span>
+          <span class="hidden sm:inline">Chia Sẻ Dữ Liệu</span>
+          <span id="headerReconCountBadge" class="hidden px-1.5 py-0.2 text-[10px] font-black rounded-full bg-slate-950 text-amber-300">0</span>
+        </button>
+
         <div class="hidden sm:flex items-center gap-2 bg-slate-800/80 px-2.5 py-1.5 rounded-lg border border-slate-700">
           <span class="w-2 h-2 rounded-full bg-emerald-400 pulse-dot"></span>
           <span class="text-slate-300 text-[11px]" id="syncStatus">Google Sheets Live</span>
@@ -203,7 +221,10 @@
           <button onclick="selectDaysFast(14)" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 font-medium transition">14 ngày qua</button>
           <button onclick="selectMonthFast('ALL')" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 font-medium transition">Tất cả</button>
           
-          <button onclick="exportExcelReport()" class="ml-2 px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg flex items-center gap-1 transition shadow-sm">
+          <button onclick="openShareModal()" class="ml-1 px-2.5 py-1 bg-amber-600/30 hover:bg-amber-600 text-amber-300 hover:text-white border border-amber-500/50 rounded-lg font-semibold flex items-center gap-1 transition shadow-sm" title="Tạo link chia sẻ dữ liệu đối chiếu">
+            <span>🔗 Chia Sẻ Link</span>
+          </button>
+          <button onclick="exportExcelReport()" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg flex items-center gap-1 transition shadow-sm">
             <span>⬇ Xuất Excel (.xlsx)</span>
           </button>
           <button onclick="printMonthlyPDF()" class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium rounded-lg border border-slate-700 transition">
@@ -724,6 +745,94 @@
             <span>⚡ Nạp / Cập nhật file đối chiếu cho Wave này</span>
           </button>
           <button onclick="closeModal()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-xs font-semibold">Đóng</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- POPUP MODAL: CHIA SẺ & ĐỒNG BỘ DỮ LIỆU ĐỐI CHIẾU VƯỢT TỒN (SHARE & SYNC)   -->
+    <!-- ========================================================================= -->
+    <div id="shareModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden no-print">
+      <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto custom-scrollbar">
+        
+        <!-- Modal Header -->
+        <div class="flex items-center justify-between border-b border-slate-700 pb-3">
+          <div class="flex items-center gap-2.5">
+            <div class="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-300 font-bold text-lg">
+              🔗
+            </div>
+            <div>
+              <h3 class="text-base font-bold text-white">Chia Sẻ & Đồng Bộ Dữ Liệu Đối Chiếu Vượt Tồn</h3>
+              <p class="text-xs text-slate-400">Tạo link gửi Zalo/Teams để người nhận mở lên là thấy ngay dữ liệu</p>
+            </div>
+          </div>
+          <button onclick="closeShareModal()" class="w-8 h-8 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 flex items-center justify-center transition">✕</button>
+        </div>
+
+        <!-- Section 1: Tạo Link Chia Sẻ Nhanh -->
+        <div class="bg-gradient-to-r from-amber-950/40 via-slate-900 to-slate-900 border border-amber-500/50 rounded-xl p-4 space-y-3">
+          <div class="flex items-center justify-between">
+            <div class="text-xs font-bold text-amber-300 uppercase tracking-wide flex items-center gap-1.5">
+              <span>⚡</span>
+              <span>Cách 1: Sao Chép Link Chia Sẻ Trực Tiếp (Khuyên dùng)</span>
+            </div>
+            <span id="shareStatusBadge" class="text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-semibold">Đang có 0 Wave</span>
+          </div>
+          
+          <p class="text-xs text-slate-300">
+            Dữ liệu đối chiếu vượt tồn trên máy bạn được mã hoá nén trực tiếp vào đường link. Đồng nghiệp chỉ cần <b>click vào link</b> này là dữ liệu sẽ tự động đồng bộ ngay lập tức!
+          </p>
+
+          <div class="flex gap-2">
+            <input type="text" id="shareLinkInput" readonly class="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs font-mono text-slate-200 select-all focus:outline-none focus:border-amber-500" placeholder="Đang tạo link chia sẻ...">
+            <button onclick="copyShareLinkToClipboard()" class="px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black rounded-lg text-xs flex items-center gap-1.5 transition shadow-lg shrink-0 cursor-pointer">
+              <span id="copyBtnIcon">📋</span>
+              <span id="copyBtnText">Sao Chép Link</span>
+            </button>
+          </div>
+          
+          <div id="copySuccessMsg" class="hidden text-xs text-emerald-300 font-semibold flex items-center gap-1.5 bg-emerald-950/50 border border-emerald-500/40 p-2 rounded-lg">
+            <span>✅ Đã sao chép link thành công! Hãy dán (Ctrl+V) gửi cho đồng nghiệp qua Zalo/Teams nhé.</span>
+          </div>
+        </div>
+
+        <!-- Section 2: Xuất / Nhập File JSON (Dự phòng cho dữ liệu lớn) -->
+        <div class="bg-slate-900/70 border border-slate-700 rounded-xl p-4 space-y-3">
+          <div class="text-xs font-bold text-slate-300 uppercase tracking-wide flex items-center gap-1.5">
+            <span>💾</span>
+            <span>Cách 2: Xuất & Nhập File Dữ Liệu (.json)</span>
+          </div>
+          <p class="text-xs text-slate-400">
+            Dùng để sao lưu dự phòng hoặc chuyển dữ liệu giữa các máy tính:
+          </p>
+          <div class="flex flex-wrap items-center gap-2">
+            <button onclick="exportReconciliationJson()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-600 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition">
+              <span>📤 Xuất File (.json)</span>
+            </button>
+            <label class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-slate-600 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer">
+              <span>📥 Nhập File (.json)</span>
+              <input type="file" id="importJsonFileInput" accept=".json,.kfm" class="hidden" onchange="importReconciliationJson(event)">
+            </label>
+            <button onclick="clearAllReconciliations()" class="px-3 py-1.5 bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-800/40 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ml-auto">
+              <span>🗑️ Xoá Tất Cả Đã Lưu</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Section 3: Danh Sách Các Wave Đang Có Dữ Liệu Đối Chiếu -->
+        <div class="space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-300 uppercase">Danh Sách Wave Đã Gắn Đối Chiếu Vượt Tồn:</span>
+            <span class="text-xs text-slate-400" id="shareListCount">0 wave</span>
+          </div>
+          <div id="shareWaveListContainer" class="max-h-44 overflow-y-auto custom-scrollbar border border-slate-700 rounded-xl divide-y divide-slate-800 bg-slate-900/50">
+            <!-- Dynamic Wave List -->
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="pt-2 flex justify-end">
+          <button onclick="closeShareModal()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-xs font-semibold">Đóng</button>
         </div>
       </div>
     </div>
@@ -1869,7 +1978,7 @@
       currentSelectedWaveObj = null;
     }
 
-    // ---------- STORAGE HELPERS ----------
+    // ---------- STORAGE & SHARING HELPERS ----------
     function getStorageKey(waveName, pt) {
       const clean = (waveName || pt || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '_');
       return `kfm_recon_${clean}`;
@@ -1879,6 +1988,7 @@
       try {
         const key = getStorageKey(waveName);
         localStorage.setItem(key, JSON.stringify(data));
+        updateHeaderReconBadge();
       } catch (e) {
         console.warn('LocalStorage save failed', e);
       }
@@ -1891,6 +2001,366 @@
         return item ? JSON.parse(item) : null;
       } catch (e) {
         return null;
+      }
+    }
+
+    function getAllReconciliations() {
+      const result = {};
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith('kfm_recon_')) {
+            try {
+              const val = JSON.parse(localStorage.getItem(key));
+              if (val) {
+                result[key] = val;
+              }
+            } catch (e) {}
+          }
+        }
+      } catch (e) {}
+      return result;
+    }
+
+    function updateHeaderReconBadge() {
+      const all = getAllReconciliations();
+      const count = Object.keys(all).length;
+      const badge = document.getElementById('headerReconCountBadge');
+      if (badge) {
+        if (count > 0) {
+          badge.innerText = count;
+          badge.classList.remove('hidden');
+        } else {
+          badge.classList.add('hidden');
+        }
+      }
+    }
+
+    // ---------- COMPRESSION FOR URL SHARING ----------
+    function compressShareData(str) {
+      if (window.LZString && typeof window.LZString.compressToEncodedURIComponent === 'function') {
+        return 'lz:' + window.LZString.compressToEncodedURIComponent(str);
+      }
+      return 'b64:' + btoa(unescape(encodeURIComponent(str)));
+    }
+
+    function decompressShareData(str) {
+      if (!str) return null;
+      try {
+        if (str.startsWith('lz:')) {
+          const raw = str.slice(3);
+          if (window.LZString && typeof window.LZString.decompressFromEncodedURIComponent === 'function') {
+            return window.LZString.decompressFromEncodedURIComponent(raw);
+          }
+        } else if (str.startsWith('b64:')) {
+          return decodeURIComponent(escape(atob(str.slice(4))));
+        }
+        if (window.LZString) {
+          const tryLz = window.LZString.decompressFromEncodedURIComponent(str);
+          if (tryLz && (tryLz.startsWith('{') || tryLz.startsWith('['))) return tryLz;
+        }
+        try {
+          return decodeURIComponent(escape(atob(str)));
+        } catch (e1) {
+          return decodeURIComponent(str);
+        }
+      } catch (err) {
+        console.warn('Decompress error:', err);
+        return null;
+      }
+    }
+
+    // ---------- SHARE MODAL LOGIC ----------
+    function openShareModal() {
+      const allRecon = getAllReconciliations();
+      const count = Object.keys(allRecon).length;
+      
+      const badge = document.getElementById('shareStatusBadge');
+      if (badge) {
+        badge.innerText = count > 0 ? `Đang lưu ${count} Wave` : 'Chưa có Wave nào';
+        badge.className = count > 0 
+          ? 'text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-semibold'
+          : 'text-[11px] px-2 py-0.5 rounded-full bg-slate-700 text-slate-400 border border-slate-600 font-semibold';
+      }
+
+      const input = document.getElementById('shareLinkInput');
+      const copyMsg = document.getElementById('copySuccessMsg');
+      if (copyMsg) copyMsg.classList.add('hidden');
+
+      const copyBtnText = document.getElementById('copyBtnText');
+      const copyBtnIcon = document.getElementById('copyBtnIcon');
+      if (copyBtnText) copyBtnText.innerText = 'Sao Chép Link';
+      if (copyBtnIcon) copyBtnIcon.innerText = '📋';
+
+      if (count === 0) {
+        input.value = window.location.href.split('#')[0].split('?')[0];
+      } else {
+        const payload = {
+          v: 1,
+          createdAt: new Date().toISOString(),
+          data: allRecon
+        };
+        const jsonStr = JSON.stringify(payload);
+        const compressed = compressShareData(jsonStr);
+        const baseUrl = window.location.href.split('#')[0].split('?')[0];
+        input.value = `${baseUrl}#share=${compressed}`;
+      }
+
+      renderShareWaveList(allRecon);
+      document.getElementById('shareModal').classList.remove('hidden');
+    }
+
+    function closeShareModal() {
+      document.getElementById('shareModal').classList.add('hidden');
+    }
+
+    function copyShareLinkToClipboard() {
+      const input = document.getElementById('shareLinkInput');
+      if (!input || !input.value) return;
+
+      const allRecon = getAllReconciliations();
+      const count = Object.keys(allRecon).length;
+
+      input.select();
+      input.setSelectionRange(0, 99999);
+
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(input.value).catch(() => {
+          document.execCommand('copy');
+        });
+      } else {
+        document.execCommand('copy');
+      }
+
+      const copyBtnText = document.getElementById('copyBtnText');
+      const copyBtnIcon = document.getElementById('copyBtnIcon');
+      if (copyBtnText) copyBtnText.innerText = 'Đã Chép!';
+      if (copyBtnIcon) copyBtnIcon.innerText = '✅';
+
+      const copyMsg = document.getElementById('copySuccessMsg');
+      if (copyMsg) {
+        copyMsg.classList.remove('hidden');
+        if (count === 0) {
+          copyMsg.innerHTML = `<span>⚠️ Hiện tại bạn chưa nạp dữ liệu đối chiếu nào. Link đã sao chép là trang web gốc.</span>`;
+        } else {
+          copyMsg.innerHTML = `<span>✅ <b>Đã sao chép link thành công!</b> Link đã kèm dữ liệu của <b>${count} Wave</b>. Dán (Ctrl+V) gửi cho đồng nghiệp qua Zalo/Teams nhé.</span>`;
+        }
+      }
+
+      setTimeout(() => {
+        if (copyBtnText) copyBtnText.innerText = 'Sao Chép Link';
+        if (copyBtnIcon) copyBtnIcon.innerText = '📋';
+      }, 4000);
+    }
+
+    function renderShareWaveList(allRecon) {
+      const container = document.getElementById('shareWaveListContainer');
+      const countLabel = document.getElementById('shareListCount');
+      if (!container) return;
+
+      const keys = Object.keys(allRecon || getAllReconciliations());
+      if (countLabel) countLabel.innerText = `${keys.length} Wave`;
+
+      if (keys.length === 0) {
+        container.innerHTML = `
+          <div class="p-4 text-center text-xs text-slate-500">
+            <p>Chưa có Wave nào được lưu dữ liệu đối chiếu trong bộ nhớ máy tính.</p>
+            <p class="text-[11px] text-slate-600 mt-1">Khi bạn làm báo cáo ở Tool 1 và chọn Wave, kết quả sẽ tự động lưu vào đây.</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = keys.map(k => {
+        const item = allRecon[k];
+        const waveName = item.wave || k.replace('kfm_recon_', '');
+        const overCount = item.overStockCount || (item.items ? item.items.length : 0);
+        const overQty = item.overStockQty ? item.overStockQty.toLocaleString('vi-VN') : '0';
+        const dateStr = item.updatedAt || 'Hôm nay';
+        
+        return `
+          <div class="p-3 flex items-center justify-between text-xs hover:bg-slate-800/60 transition">
+            <div class="flex items-center gap-2.5">
+              <span class="text-base">${overCount > 0 ? '⚠️' : '✅'}</span>
+              <div>
+                <div class="font-bold text-white">${waveName}</div>
+                <div class="text-[11px] text-slate-400">
+                  ${overCount > 0 ? `<span class="text-rose-400 font-semibold">Vượt tồn: ${overCount} SKU (${overQty} unit)</span>` : '<span class="text-emerald-400 font-semibold">Đủ tồn kho</span>'}
+                  <span class="text-slate-600 mx-1">•</span>
+                  <span>Khớp BC: ${item.barcodeRatio || '100%'}</span>
+                  <span class="text-slate-600 mx-1">•</span>
+                  <span class="text-slate-500">${dateStr}</span>
+                </div>
+              </div>
+            </div>
+            <button onclick="deleteSingleWaveReconciliation('${k}', '${waveName}')" class="px-2 py-1 text-slate-400 hover:text-rose-400 hover:bg-rose-950/40 rounded transition cursor-pointer" title="Xoá đối chiếu của Wave này">
+              🗑️
+            </button>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function deleteSingleWaveReconciliation(key, waveName) {
+      if (!confirm(`Bạn có chắc muốn xoá dữ liệu đối chiếu của Wave: ${waveName}?`)) return;
+      localStorage.removeItem(key);
+      const targetOrder = rawOrders.find(o => o.wave === waveName);
+      if (targetOrder) targetOrder.reconcile = null;
+      populateT1WaveSelector();
+      applyFilters();
+      openShareModal();
+      updateHeaderReconBadge();
+    }
+
+    function clearAllReconciliations() {
+      const all = getAllReconciliations();
+      const count = Object.keys(all).length;
+      if (count === 0) {
+        alert('Hiện không có dữ liệu nào để xoá!');
+        return;
+      }
+      if (!confirm(`Bạn có chắc muốn xoá toàn bộ dữ liệu đối chiếu (${count} Wave) đã lưu trên máy tính này?`)) return;
+
+      Object.keys(all).forEach(k => localStorage.removeItem(k));
+      rawOrders.forEach(o => o.reconcile = null);
+      populateT1WaveSelector();
+      applyFilters();
+      openShareModal();
+      updateHeaderReconBadge();
+      alert('Đã xoá sạch dữ liệu đối chiếu đã lưu!');
+    }
+
+    // ---------- EXPORT & IMPORT JSON FILE ----------
+    function exportReconciliationJson() {
+      const all = getAllReconciliations();
+      const count = Object.keys(all).length;
+      if (count === 0) {
+        alert('Chưa có dữ liệu đối chiếu nào được lưu để xuất file!');
+        return;
+      }
+      const payload = {
+        app: 'KFM_FROZEN_WMS',
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        count,
+        data: all
+      };
+      const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(payload, null, 2));
+      const link = document.createElement('a');
+      link.setAttribute('href', dataStr);
+      link.setAttribute('download', `KFM_Reconciliation_Data_${new Date().toISOString().slice(0, 10)}.json`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    function importReconciliationJson(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const content = e.target.result;
+          const payload = JSON.parse(content);
+          const data = payload.data || payload;
+          let count = 0;
+
+          Object.keys(data).forEach(key => {
+            if (key.startsWith('kfm_recon_')) {
+              localStorage.setItem(key, JSON.stringify(data[key]));
+              count++;
+            } else if (data[key] && data[key].wave) {
+              const storageKey = getStorageKey(data[key].wave);
+              localStorage.setItem(storageKey, JSON.stringify(data[key]));
+              count++;
+            }
+          });
+
+          if (count > 0) {
+            rawOrders.forEach(o => {
+              o.reconcile = getSavedReconciliation(o.wave, o.pt);
+            });
+            populateT1WaveSelector();
+            applyFilters();
+            openShareModal();
+            updateHeaderReconBadge();
+            showSyncToastBanner(count, 'Nhập File Thành Công');
+            alert(`✅ Đã nạp thành công dữ liệu đối chiếu của ${count} Wave từ file!`);
+          } else {
+            alert('Không tìm thấy dữ liệu hợp lệ trong file!');
+          }
+        } catch (err) {
+          alert('Lỗi khi đọc file JSON: ' + err.message);
+        }
+        event.target.value = '';
+      };
+      reader.readAsText(file);
+    }
+
+    // ---------- AUTO SYNC ON PAGE LOAD FROM URL HASH ----------
+    function autoSyncFromUrl() {
+      let shareParam = '';
+      if (window.location.hash && window.location.hash.includes('share=')) {
+        shareParam = window.location.hash.substring(window.location.hash.indexOf('share=') + 6);
+      }
+      if (!shareParam) {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('share')) {
+          shareParam = params.get('share');
+        }
+      }
+
+      if (!shareParam) {
+        updateHeaderReconBadge();
+        return 0;
+      }
+
+      try {
+        const jsonStr = decompressShareData(shareParam);
+        if (!jsonStr) throw new Error('Không thể giải nén dữ liệu liên kết');
+        const payload = JSON.parse(jsonStr);
+        const data = payload.data || payload;
+        let syncedCount = 0;
+
+        Object.keys(data).forEach(key => {
+          if (key.startsWith('kfm_recon_')) {
+            localStorage.setItem(key, JSON.stringify(data[key]));
+            syncedCount++;
+          } else if (data[key] && data[key].wave) {
+            const storageKey = getStorageKey(data[key].wave);
+            localStorage.setItem(storageKey, JSON.stringify(data[key]));
+            syncedCount++;
+          }
+        });
+
+        if (syncedCount > 0) {
+          showSyncToastBanner(syncedCount, 'Tự Động Đồng Bộ Thành Công');
+          if (window.history && window.history.replaceState) {
+            const cleanUrl = window.location.pathname + window.location.search.replace(/[\?&]share=[^&]*/, '').replace(/^&/, '?');
+            window.history.replaceState(null, '', cleanUrl);
+          }
+          updateHeaderReconBadge();
+          return syncedCount;
+        }
+      } catch (err) {
+        console.warn('Auto-sync from share URL failed:', err);
+      }
+      updateHeaderReconBadge();
+      return 0;
+    }
+
+    function showSyncToastBanner(count, titleText = 'ĐÃ ĐỒNG BỘ DỮ LIỆU ĐỐI CHIẾU!') {
+      const banner = document.getElementById('syncToastBanner');
+      const title = document.getElementById('syncToastTitle');
+      const desc = document.getElementById('syncToastDesc');
+      if (banner && title && desc) {
+        title.innerText = `🎉 ${titleText}`;
+        desc.innerHTML = `Đã tự động tải thành công dữ liệu đối chiếu vượt tồn của <b>${count} Wave</b> từ liên kết chia sẻ!`;
+        banner.classList.remove('hidden');
+        setTimeout(() => {
+          banner.classList.add('hidden');
+        }, 8000);
       }
     }
 
@@ -2458,9 +2928,14 @@
                   <div class="text-xs text-emerald-300 mt-0.5">Dữ liệu đối chiếu đã được gán trực tiếp vào: <b class="text-white underline">${r.targetWave}</b></div>
                 </div>
               </div>
-              <button onclick="viewWaveOnDashboard('${r.targetWave}')" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg shadow flex items-center gap-1.5 transition">
-                <span>📊 Mở Xem Ngay Trên Dashboard ➔</span>
-              </button>
+              <div class="flex items-center gap-2">
+                <button onclick="openShareModal()" class="px-3.5 py-2 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-slate-950 font-bold rounded-lg shadow flex items-center gap-1.5 transition">
+                  <span>🔗 Tạo Link Gửi Đồng Nghiệp</span>
+                </button>
+                <button onclick="viewWaveOnDashboard('${r.targetWave}')" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg shadow flex items-center gap-1.5 transition">
+                  <span>📊 Mở Dashboard ➔</span>
+                </button>
+              </div>
             </div>
           `;
         }
@@ -3500,12 +3975,17 @@
 
     // ---------- GLOBAL INITIALIZATION ----------
     window.addEventListener('DOMContentLoaded', () => {
+      autoSyncFromUrl();
       fetchLiveSheet();
       autoRefreshTimer = setInterval(fetchLiveSheet, 60000);
+      updateHeaderReconBadge();
     });
 
     window.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') closeModal();
+      if (e.key === 'Escape') {
+        closeModal();
+        closeShareModal();
+      }
     });
   </script>
 </body>
