@@ -4142,7 +4142,8 @@ function doPost(e) {
                 const bc = normCode(bcRaw);
                 masterMap.set(bc, {
                   ten: tenCol && row[tenCol] ? String(row[tenCol]).trim() : '',
-                  loai: loaiCol && row[loaiCol] ? String(row[loaiCol]).trim().toUpperCase() : 'ĐÔNG'
+                  loai: loaiCol && row[loaiCol] ? String(row[loaiCol]).trim().toUpperCase() : 'ĐÔNG',
+                  sampleLocations: []
                 });
               }
             }
@@ -4156,26 +4157,65 @@ function doPost(e) {
               const locCol = h.find(x => headerKey(x).includes('location') || headerKey(x).includes('vitri'));
 
               for (const row of sheet.rows) {
-                if (locCol && row[locCol]) set.add(normCode(row[locCol]));
+                const locVal = locCol && row[locCol] ? normCode(row[locCol]) : '';
+                if (locVal) set.add(locVal);
                 if (bcCol && row[bcCol]) {
                   const bc = normCode(row[bcCol]);
                   if (!masterMap.has(bc)) {
                     masterMap.set(bc, {
                       ten: tenCol && row[tenCol] ? String(row[tenCol]).trim() : '',
-                      loai: zoneName
+                      loai: zoneName,
+                      sampleLocations: []
                     });
+                  }
+                  if (locVal && !locVal.startsWith('FRSG') && !locVal.startsWith('TRSG') && !locVal.includes('STAGE') && !locVal.includes('CHO')) {
+                    const entry = masterMap.get(bc);
+                    if (entry && !entry.sampleLocations.includes(locVal)) {
+                      entry.sampleLocations.push(locVal);
+                    }
                   }
                 }
               }
             }
-            // 3. Other sheets: extract location codes
+            // 3. Other sheets (e.g. general stock file with Barcode & Location)
             else {
-              const zoneName = sheetUpper;
-              if (!zoneLocations.has(zoneName)) zoneLocations.set(zoneName, new Set());
-              const set = zoneLocations.get(zoneName);
-              for (const row of sheet.aoa.slice(1)) {
-                const v = row && row[0];
-                if (v != null && String(v).trim() !== '') set.add(normCode(v));
+              const bcCol = h.find(x => headerKey(x) === 'barcode' || headerKey(x).includes('mahang'));
+              const tenCol = h.find(x => headerKey(x).includes('sanpham') || headerKey(x) === 'ten');
+              const locCol = h.find(x => headerKey(x).includes('location') || headerKey(x).includes('vitri'));
+
+              if (bcCol && locCol) {
+                for (const row of sheet.rows) {
+                  const locVal = row[locCol] ? normCode(row[locCol]) : '';
+                  const bcVal = row[bcCol] ? normCode(row[bcCol]) : '';
+                  if (!bcVal) continue;
+                  const isChilled = locVal.startsWith('C') || locVal.startsWith('CRSG');
+                  const zoneName = isChilled ? 'MÁT' : 'ĐÔNG';
+                  if (locVal) {
+                    if (isChilled) zoneLocations.get('MÁT').add(locVal);
+                    else zoneLocations.get('ĐÔNG').add(locVal);
+                  }
+                  if (!masterMap.has(bcVal)) {
+                    masterMap.set(bcVal, {
+                      ten: tenCol && row[tenCol] ? String(row[tenCol]).trim() : '',
+                      loai: zoneName,
+                      sampleLocations: []
+                    });
+                  }
+                  if (locVal && !locVal.startsWith('FRSG') && !locVal.startsWith('TRSG') && !locVal.includes('STAGE') && !locVal.includes('CHO')) {
+                    const entry = masterMap.get(bcVal);
+                    if (entry && !entry.sampleLocations.includes(locVal)) {
+                      entry.sampleLocations.push(locVal);
+                    }
+                  }
+                }
+              } else {
+                const zoneName = sheetUpper;
+                if (!zoneLocations.has(zoneName)) zoneLocations.set(zoneName, new Set());
+                const set = zoneLocations.get(zoneName);
+                for (const row of sheet.aoa.slice(1)) {
+                  const v = row && row[0];
+                  if (v != null && String(v).trim() !== '') set.add(normCode(v));
+                }
               }
             }
           }
@@ -4225,22 +4265,26 @@ function doPost(e) {
           for (const sheet of f.sheets) {
             if (!isStockSheet(sheet)) continue;
             const h = sheet.headers;
-            const bcCol = h.find(x => headerKey(x) === 'barcode');
+            const bcCol = h.find(x => headerKey(x) === 'barcode' || headerKey(x).includes('mahang'));
             const locCol = h.find(x => headerKey(x).includes('location') || headerKey(x).includes('vitri'));
-            const prodCol = h.find(x => headerKey(x).includes('sanpham'));
+            const prodCol = h.find(x => headerKey(x).includes('sanpham') || headerKey(x) === 'ten');
             const qtyCands = h.filter(x => headerKey(x).includes('soluong') || headerKey(x).includes('quantity')).sort((a,b)=>a.length-b.length);
             const qtyCol = qtyCands[0];
             const uomCol = h.find(x => headerKey(x) === 'uom' || headerKey(x).includes('donvi'));
+            const sheetUpper = (sheet.sheetName || '').trim().toUpperCase();
+            const sheetZone = (sheetUpper.includes('MÁT') || sheetUpper.includes('CHILLED')) ? 'MÁT' : (sheetUpper.includes('ĐÔNG') || sheetUpper.includes('FROZEN') ? 'ĐÔNG' : '');
 
             for (const row of sheet.rows) {
               const bcRaw = row[bcCol];
               if (bcRaw === null || bcRaw === undefined || String(bcRaw).trim() === '') continue;
+              const rawLoc = locCol && row[locCol] ? normCode(row[locCol]) : '';
               rows.push({
                 barcode: normCode(bcRaw),
-                location: locCol ? normCode(row[locCol]) : '',
+                location: rawLoc,
                 product: prodCol && row[prodCol] != null ? String(row[prodCol]).trim() : '',
                 qty: qtyCol ? toNum(row[qtyCol]) : 0,
-                uom: uomCol && row[uomCol] != null ? String(row[uomCol]).trim() : ''
+                uom: uomCol && row[uomCol] != null ? String(row[uomCol]).trim() : '',
+                sheetZone: sheetZone
               });
             }
           }
@@ -4261,79 +4305,133 @@ function doPost(e) {
             return;
           }
 
-          const { masterMap, zoneLocations, zonePatterns } = buildMaster(nonWmsFiles);
+          const { masterMap, zoneLocations, zonePatterns } = buildMaster(nonWmsFiles.length ? nonWmsFiles : wmsFiles);
 
           let detailRows = [];
           let hasTimeData = false;
 
+          let wmsRows = [];
           if (wmsFiles.length > 0) {
             hasTimeData = true;
-            const wmsRows = buildWmsRows(wmsFiles);
-            if (!wmsRows.length) {
-              showErr('Không tìm thấy dòng dữ liệu LPN hợp lệ trong file WMS.');
-              return;
-            }
-
+            wmsRows = buildWmsRows(wmsFiles);
             for (const r of wmsRows) {
               const m = masterMap.get(r.barcode);
               if (m && m.ten && !r.product) r.product = m.ten;
-              r.expectedZone = (m && m.loai) ? m.loai : 'ĐÔNG';
+              r.expectedZone = (m && m.loai) ? m.loai : (r.location.startsWith('C') ? 'MÁT' : 'ĐÔNG');
+              r.suggestedRack = (m && m.sampleLocations && m.sampleLocations.length) ? m.sampleLocations[0] : '';
 
               const actualZone = zoneOfPattern(zonePatterns, r.location);
-              r.actualZone = actualZone || (r.isStaging ? '— (Chờ Put)' : '');
+              r.actualZone = actualZone || (r.isStaging ? ('— (Chờ Put ' + r.location + ')') : (r.location.startsWith('F') ? 'ĐÔNG' : (r.location.startsWith('C') ? 'MÁT' : '')));
 
               let putStatus;
               if (r.isStaging) {
                 putStatus = 'Chưa được Put';
-              } else if (!actualZone) {
-                putStatus = r.location.startsWith('F') ? 'Put đúng' : (r.location.startsWith('C') ? 'Put sai' : 'Không xác định');
-              } else if (r.expectedZone) {
+              } else if (actualZone) {
                 putStatus = (actualZone === r.expectedZone) ? 'Put đúng' : 'Put sai';
               } else {
-                putStatus = 'Put đúng';
+                putStatus = r.location.startsWith('F') ? (r.expectedZone === 'ĐÔNG' ? 'Put đúng' : 'Put sai') : (r.location.startsWith('C') ? (r.expectedZone === 'MÁT' ? 'Put đúng' : 'Put sai') : 'Không xác định');
               }
 
               r.putStatus = putStatus;
               r.status = putStatus;
               r.isOverdue = r.durationMinutes > 30;
               r.slaStatus = r.isOverdue ? 'Trễ hạn (> 30p)' : 'Đúng hạn (≤ 30p)';
+              r.sourceType = 'wms';
             }
-            detailRows = wmsRows;
+          }
 
-          } else {
-            hasTimeData = false;
-            const stockRows = buildStockRows(stockFiles.length ? stockFiles : masterFiles);
-            for (const sr of stockRows) {
+          let stockRows = [];
+          if (stockFiles.length > 0 || masterFiles.length > 0) {
+            const rawStock = buildStockRows(stockFiles.length ? stockFiles : masterFiles);
+            for (const sr of rawStock) {
               const m = masterMap.get(sr.barcode);
-              const actualZone = zoneOfPattern(zonePatterns, sr.location);
-              const isStaging = !sr.location || sr.location.startsWith('FRSG') || sr.location.includes('CHO') || sr.location.includes('STAGE');
+              const isStaging = !sr.location || sr.location.startsWith('FRSG') || sr.location.startsWith('TRSG') || sr.location.includes('CHO') || sr.location.includes('STAGE');
+              const actualZone = zoneOfPattern(zonePatterns, sr.location) || (sr.location.startsWith('F') ? 'ĐÔNG' : (sr.location.startsWith('C') ? 'MÁT' : ''));
+              const expectedZone = sr.sheetZone || (m ? m.loai : (sr.location.startsWith('F') ? 'ĐÔNG' : (sr.location.startsWith('C') ? 'MÁT' : 'ĐÔNG')));
 
               let putStatus;
-              if (isStaging) putStatus = 'Chưa được Put';
-              else if (!m) putStatus = 'Không xác định';
-              else if (!actualZone) putStatus = 'Chưa được Put';
-              else if (actualZone === m.loai) putStatus = 'Put đúng';
-              else putStatus = 'Put sai';
+              if (isStaging) {
+                putStatus = 'Chưa được Put';
+              } else if (!expectedZone) {
+                putStatus = 'Không xác định';
+              } else if (actualZone) {
+                putStatus = (actualZone === expectedZone) ? 'Put đúng' : 'Put sai';
+              } else {
+                putStatus = 'Không xác định';
+              }
 
-              detailRows.push({
-                lpn: sr.barcode,
+              stockRows.push({
+                lpn: sr.barcode ? ('Mã ' + sr.barcode) : ('Kệ ' + sr.location),
                 location: sr.location,
                 barcode: sr.barcode,
                 product: (m && m.ten) || sr.product || '',
-                expectedZone: m ? m.loai : 'ĐÔNG',
+                expectedZone: expectedZone,
                 actualZone: actualZone || (isStaging ? '— (Chờ Put)' : ''),
+                suggestedRack: '',
                 putStatus,
                 status: putStatus,
                 isStaging,
                 qty: sr.qty,
                 uom: sr.uom || '',
                 durationMinutes: 0,
-                durationFormatted: '—',
+                durationFormatted: isStaging ? '— (Chờ Put)' : '— (Đã trên kệ)',
                 isOverdue: false,
                 slaStatus: '—',
                 recvFormatted: '—',
-                actFormatted: '—'
+                actFormatted: '—',
+                sourceType: 'stock'
               });
+            }
+          }
+
+          if (wmsRows.length > 0 && stockRows.length > 0) {
+            const wmsBarcodes = new Set(wmsRows.map(r => r.barcode));
+            const stockRackRows = stockRows.filter(sr => !sr.isStaging || !wmsBarcodes.has(sr.barcode));
+            detailRows = [...wmsRows, ...stockRackRows];
+          } else if (wmsRows.length > 0) {
+            detailRows = wmsRows;
+          } else {
+            detailRows = stockRows;
+          }
+
+          const totalLpns = detailRows.length;
+          const putDungCount = detailRows.filter(r => r.putStatus === 'Put đúng').length;
+          const putSaiCount = detailRows.filter(r => r.putStatus === 'Put sai').length;
+          const chuaPutCount = detailRows.filter(r => r.putStatus === 'Chưa được Put').length;
+          const khongXDCount = detailRows.filter(r => r.putStatus === 'Không xác định').length;
+
+          const timeRows = detailRows.filter(r => r.sourceType === 'wms' || r.durationMinutes > 0);
+          const hasTimeTracking = timeRows.length > 0;
+          const overdueCount = timeRows.filter(r => r.isOverdue).length;
+          const onTimeCount = timeRows.filter(r => !r.isOverdue).length;
+          const maxDurationMinutes = timeRows.length > 0 ? Math.max(...timeRows.map(r => r.durationMinutes || 0), 0) : 0;
+          const maxOverdueItem = timeRows.find(r => r.durationMinutes === maxDurationMinutes);
+
+          lastReport = {
+            hasTimeData,
+            detailRows,
+            timeRows,
+            totalLpns,
+            putDungCount,
+            putSaiCount,
+            chuaPutCount,
+            khongXDCount,
+            overdueCount,
+            onTimeCount,
+            maxDurationMinutes,
+            maxOverdueItem,
+            generatedAt: new Date()
+          };
+
+          pieView = 'put'; // Default view: Put đúng / Put sai / Chưa put
+          pieMode = 'rows';
+          activeFilter = 'all';
+          renderReportT3(lastReport);
+
+        } catch (err) {
+          showErr('Có lỗi khi kiểm tra đơn Put: ' + err.message);
+        }
+      });
             }
           }
 
@@ -4379,13 +4477,15 @@ function doPost(e) {
         const putDungPct = ((r.putDungCount / total) * 100).toFixed(1);
         const putSaiPct = ((r.putSaiCount / total) * 100).toFixed(1);
         const chuaPutPct = ((r.chuaPutCount / total) * 100).toFixed(1);
-        const onTimePct = ((r.onTimeCount / total) * 100).toFixed(1);
-        const overduePct = ((r.overdueCount / total) * 100).toFixed(1);
+        const timeRows = (r.timeRows && r.timeRows.length) ? r.timeRows : r.detailRows.filter(row => row.sourceType === 'wms' || row.durationMinutes > 0);
+        const timeTotal = timeRows.length || 1;
+        const onTimePct = timeRows.length ? ((r.onTimeCount / timeTotal) * 100).toFixed(1) : '0.0';
+        const overduePct = timeRows.length ? ((r.overdueCount / timeTotal) * 100).toFixed(1) : '0.0';
 
         // Time bins
         let countB1 = 0, countB2 = 0, countB3 = 0, countB4 = 0;
         let totalMinutes = 0;
-        r.detailRows.forEach(row => {
+        timeRows.forEach(row => {
           const m = row.durationMinutes || 0;
           totalMinutes += m;
           if (m <= 30) countB1++;
@@ -4393,11 +4493,11 @@ function doPost(e) {
           else if (m <= 120) countB3++;
           else countB4++;
         });
-        const b1 = { count: countB1, pct: ((countB1 / total) * 100).toFixed(1) };
-        const b2 = { count: countB2, pct: ((countB2 / total) * 100).toFixed(1) };
-        const b3 = { count: countB3, pct: ((countB3 / total) * 100).toFixed(1) };
-        const b4 = { count: countB4, pct: ((countB4 / total) * 100).toFixed(1) };
-        const avgMinutes = Math.round(totalMinutes / total);
+        const b1 = { count: countB1, pct: ((countB1 / timeTotal) * 100).toFixed(1) };
+        const b2 = { count: countB2, pct: ((countB2 / timeTotal) * 100).toFixed(1) };
+        const b3 = { count: countB3, pct: ((countB3 / timeTotal) * 100).toFixed(1) };
+        const b4 = { count: countB4, pct: ((countB4 / timeTotal) * 100).toFixed(1) };
+        const avgMinutes = timeRows.length ? Math.round(totalMinutes / timeTotal) : 0;
         const avgDurationFormatted = formatDuration(avgMinutes);
         const maxDurationFormatted = formatDuration(r.maxDurationMinutes || 0);
 
@@ -4413,7 +4513,8 @@ function doPost(e) {
         pieOrder.forEach(s => pieStats[s] = 0);
         let pieTotalVal = 0;
 
-        r.detailRows.forEach(row => {
+        const pieSourceRows = (pieView === 'sla' && r.hasTimeData) ? timeRows : r.detailRows;
+        pieSourceRows.forEach(row => {
           const key = (pieView === 'sla' && r.hasTimeData) ? row.slaStatus : row.putStatus;
           if (pieStats[key] !== undefined) {
             const v = pieMode === 'qty' ? (row.qty || 0) : 1;
@@ -4735,7 +4836,7 @@ function doPost(e) {
               <td class="py-2.5 px-3 font-mono text-slate-300">${r.barcode || '—'}</td>
               <td class="py-2.5 px-3 max-w-xs truncate text-white font-medium" title="${r.product}">${r.product}</td>
               <td class="py-2.5 px-3 whitespace-nowrap">${locBadge}</td>
-              <td class="py-2.5 px-3 text-slate-300 text-center font-medium">${r.expectedZone || '—'}</td>
+              <td class="py-2.5 px-3 text-slate-300 text-center font-medium"><div>${r.expectedZone || '—'}</div>${r.suggestedRack ? `<div class="text-[10px] text-amber-300 font-normal">Gợi ý: ${r.suggestedRack}</div>` : ''}</td>
               <td class="py-2.5 px-3 text-slate-300 text-center font-medium">${r.actualZone || '—'}</td>
               <td class="py-2.5 px-3 whitespace-nowrap text-center">${putBadge}</td>
               <td class="py-2.5 px-3 font-mono text-xs whitespace-nowrap text-center ${durClass}">${r.durationFormatted}</td>
