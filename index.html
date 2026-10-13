@@ -4122,36 +4122,71 @@ function doPost(e) {
       function buildMaster(files) {
         const masterMap = new Map();
         const zoneLocations = new Map();
+        zoneLocations.set('ĐÔNG', new Set());
+        zoneLocations.set('MÁT', new Set());
+
         for (const f of files) {
           for (const sheet of f.sheets) {
+            const h = sheet.headers;
+            const sheetUpper = (sheet.sheetName || '').trim().toUpperCase();
+
+            // 1. Explicit Master Data Sheet
             if (isMasterSheet(sheet)) {
-              const h = sheet.headers;
-              const bcCol = h.find(x => headerKey(x).includes('mahang'));
-              const tenCol = h.find(x => headerKey(x) === 'ten' || headerKey(x).includes('tensanpham'));
-              const loaiCol = h.find(x => headerKey(x).includes('loaihang'));
+              const bcCol = h.find(x => headerKey(x).includes('mahang') || headerKey(x) === 'barcode');
+              const tenCol = h.find(x => headerKey(x) === 'ten' || headerKey(x).includes('sanpham'));
+              const loaiCol = h.find(x => headerKey(x).includes('loaihang') || headerKey(x).includes('khu'));
               for (const row of sheet.rows) {
                 const bcRaw = row[bcCol];
-                if (bcRaw === null || bcRaw === undefined || String(bcRaw).trim() === '') continue;
+                if (!bcRaw) continue;
                 const bc = normCode(bcRaw);
                 masterMap.set(bc, {
-                  ten: tenCol && row[tenCol] != null ? String(row[tenCol]).trim() : '',
-                  loai: loaiCol && row[loaiCol] != null ? String(row[loaiCol]).trim().toUpperCase() : ''
+                  ten: tenCol && row[tenCol] ? String(row[tenCol]).trim() : '',
+                  loai: loaiCol && row[loaiCol] ? String(row[loaiCol]).trim().toUpperCase() : 'ĐÔNG'
                 });
               }
-            } else {
-              const zoneName = sheet.sheetName.trim().toUpperCase();
+            }
+            // 2. Zone-named sheets (e.g. 'ĐÔNG', 'MÁT', 'FROZEN', 'CHILLED')
+            else if (['ĐÔNG', 'MÁT', 'FROZEN', 'CHILLED'].some(z => sheetUpper.includes(z))) {
+              const zoneName = (sheetUpper.includes('MÁT') || sheetUpper.includes('CHILLED')) ? 'MÁT' : 'ĐÔNG';
+              const set = zoneLocations.get(zoneName);
+
+              const bcCol = h.find(x => headerKey(x) === 'barcode' || headerKey(x).includes('mahang'));
+              const tenCol = h.find(x => headerKey(x).includes('sanpham') || headerKey(x) === 'ten');
+              const locCol = h.find(x => headerKey(x).includes('location') || headerKey(x).includes('vitri'));
+
+              for (const row of sheet.rows) {
+                if (locCol && row[locCol]) set.add(normCode(row[locCol]));
+                if (bcCol && row[bcCol]) {
+                  const bc = normCode(row[bcCol]);
+                  if (!masterMap.has(bc)) {
+                    masterMap.set(bc, {
+                      ten: tenCol && row[tenCol] ? String(row[tenCol]).trim() : '',
+                      loai: zoneName
+                    });
+                  }
+                }
+              }
+            }
+            // 3. Other sheets: extract location codes
+            else {
+              const zoneName = sheetUpper;
               if (!zoneLocations.has(zoneName)) zoneLocations.set(zoneName, new Set());
               const set = zoneLocations.get(zoneName);
               for (const row of sheet.aoa.slice(1)) {
                 const v = row && row[0];
-                if (v !== null && v !== undefined && String(v).trim() !== '') set.add(normCode(v));
+                if (v != null && String(v).trim() !== '') set.add(normCode(v));
               }
             }
           }
         }
 
-        const zonePatterns = [];
+        const zonePatterns = [
+          { zone: 'ĐÔNG', regex: /^F\d+(\.\d+)+[A-Z]*$/i },
+          { zone: 'MÁT', regex: /^C\d+(\.\d+)+[A-Z]*$/i }
+        ];
+
         for (const [zone, set] of zoneLocations) {
+          if (zone === 'ĐÔNG' || zone === 'MÁT') continue;
           const letterCounts = {};
           for (const loc of set) {
             const m = loc.match(/^([A-Z]+)/);
@@ -4162,16 +4197,24 @@ function doPost(e) {
             if (letterCounts[letter] > bestCount) { bestCount = letterCounts[letter]; bestLetter = letter; }
           }
           if (bestLetter) {
-            zonePatterns.push({ zone, regex: new RegExp('^' + bestLetter + '\\d+(\\.\\d+)+[A-Z]*$') });
+            zonePatterns.push({ zone, regex: new RegExp('^' + bestLetter + '\\d+(\\.\\d+)+[A-Z]*$', 'i') });
           }
         }
+
         return { masterMap, zoneLocations, zonePatterns };
       }
 
       function zoneOfPattern(patterns, loc) {
-        for (const zp of patterns) {
-          if (zp.regex.test(loc)) return zp.zone;
+        if (!loc) return null;
+        const cleanLoc = loc.trim().toUpperCase();
+        if (cleanLoc.startsWith('FRSG') || cleanLoc.startsWith('TRSG') || cleanLoc.includes('STAGE') || cleanLoc.includes('CHO')) {
+          return null;
         }
+        for (const zp of patterns) {
+          if (zp.regex.test(cleanLoc)) return zp.zone;
+        }
+        if (cleanLoc.startsWith('F')) return 'ĐÔNG';
+        if (cleanLoc.startsWith('C')) return 'MÁT';
         return null;
       }
 
@@ -4186,6 +4229,8 @@ function doPost(e) {
             const prodCol = h.find(x => headerKey(x).includes('sanpham'));
             const qtyCands = h.filter(x => headerKey(x).includes('soluong') || headerKey(x).includes('quantity')).sort((a,b)=>a.length-b.length);
             const qtyCol = qtyCands[0];
+            const uomCol = h.find(x => headerKey(x) === 'uom' || headerKey(x).includes('donvi'));
+
             for (const row of sheet.rows) {
               const bcRaw = row[bcCol];
               if (bcRaw === null || bcRaw === undefined || String(bcRaw).trim() === '') continue;
@@ -4193,7 +4238,8 @@ function doPost(e) {
                 barcode: normCode(bcRaw),
                 location: locCol ? normCode(row[locCol]) : '',
                 product: prodCol && row[prodCol] != null ? String(row[prodCol]).trim() : '',
-                qty: qtyCol ? toNum(row[qtyCol]) : 0
+                qty: qtyCol ? toNum(row[qtyCol]) : 0,
+                uom: uomCol && row[uomCol] != null ? String(row[uomCol]).trim() : ''
               });
             }
           }
@@ -4201,99 +4247,128 @@ function doPost(e) {
         return rows;
       }
 
+      let pieView = 'put'; // 'put' (Put Đúng/Sai/Chưa Put) hoặc 'sla' (Đúng hạn ≤ 30p / Trễ hạn > 30p)
+      let pieMode = 'rows'; // 'rows' hoặc 'qty'
+      let activeFilter = 'all';
+
       generateBtn.addEventListener('click', () => {
         try {
           showErr(null);
           const wmsFiles = state.files.filter(f => effectiveType(f) === 'wms');
           const masterFiles = state.files.filter(f => effectiveType(f) === 'master');
           const stockFiles = state.files.filter(f => effectiveType(f) === 'stock');
+          const nonWmsFiles = [...masterFiles, ...stockFiles];
+
+          if (!wmsFiles.length && !stockFiles.length && !masterFiles.length) {
+            showErr('Vui lòng nạp File WMS LPN hoặc File Tồn kho / Master Data.');
+            return;
+          }
+
+          const { masterMap, zoneLocations, zonePatterns } = buildMaster(nonWmsFiles);
+
+          let detailRows = [];
+          let hasTimeData = false;
 
           if (wmsFiles.length > 0) {
-            // MODE 1: THEO DÕI THỜI GIAN PUT & VỊ TRÍ CHỜ FRSG01 (SLA 30P)
+            hasTimeData = true;
             const wmsRows = buildWmsRows(wmsFiles);
             if (!wmsRows.length) {
               showErr('Không tìm thấy dòng dữ liệu LPN hợp lệ trong file WMS.');
               return;
             }
 
-            // Nếu có Master file, bổ sung tên chuẩn
-            if (masterFiles.length > 0) {
-              const { masterMap } = buildMaster(masterFiles);
-              wmsRows.forEach(r => {
-                const m = masterMap.get(r.barcode);
-                if (m && m.ten && !r.product) r.product = m.ten;
-                if (m) r.expectedZone = m.loai;
-              });
+            for (const r of wmsRows) {
+              const m = masterMap.get(r.barcode);
+              if (m && m.ten && !r.product) r.product = m.ten;
+              r.expectedZone = (m && m.loai) ? m.loai : 'ĐÔNG';
+
+              const actualZone = zoneOfPattern(zonePatterns, r.location);
+              r.actualZone = actualZone || (r.isStaging ? '— (Chờ Put)' : '');
+
+              let putStatus;
+              if (r.isStaging) {
+                putStatus = 'Chưa được Put';
+              } else if (!actualZone) {
+                putStatus = r.location.startsWith('F') ? 'Put đúng' : (r.location.startsWith('C') ? 'Put sai' : 'Không xác định');
+              } else if (r.expectedZone) {
+                putStatus = (actualZone === r.expectedZone) ? 'Put đúng' : 'Put sai';
+              } else {
+                putStatus = 'Put đúng';
+              }
+
+              r.putStatus = putStatus;
+              r.status = putStatus;
+              r.isOverdue = r.durationMinutes > 30;
+              r.slaStatus = r.isOverdue ? 'Trễ hạn (> 30p)' : 'Đúng hạn (≤ 30p)';
             }
-
-            const totalLpns = wmsRows.length;
-            const overdueRows = wmsRows.filter(r => r.isOverdue);
-            const stagingRows = wmsRows.filter(r => r.isStaging);
-            const rackRows = wmsRows.filter(r => !r.isStaging);
-            const maxDurationMinutes = Math.max(...wmsRows.map(r => r.durationMinutes), 0);
-            const maxOverdueItem = wmsRows.find(r => r.durationMinutes === maxDurationMinutes);
-
-            lastReport = {
-              mode: 'wms',
-              detailRows: wmsRows,
-              totalLpns,
-              overdueCount: overdueRows.length,
-              stagingCount: stagingRows.length,
-              rackCount: rackRows.length,
-              maxDurationMinutes,
-              maxOverdueItem,
-              generatedAt: new Date()
-            };
-
-            pieMode = 'rows';
-            activeFilter = 'all';
-            renderReportT3(lastReport);
+            detailRows = wmsRows;
 
           } else {
-            // MODE 2: KIỂM TRA ĐỐI CHIẾU VỊ TRÍ KỆ (MASTER + STOCK)
-            if (!stockFiles.length) {
-              showErr('Vui lòng nạp File WMS LPN (hoặc File Tồn kho).');
-              return;
-            }
-
-            const { masterMap, zoneLocations, zonePatterns } = buildMaster(masterFiles);
-            const stockRows = buildStockRows(stockFiles);
-            const detailRows = [];
-
+            hasTimeData = false;
+            const stockRows = buildStockRows(stockFiles.length ? stockFiles : masterFiles);
             for (const sr of stockRows) {
               const m = masterMap.get(sr.barcode);
               const actualZone = zoneOfPattern(zonePatterns, sr.location);
-              let status;
-              if (!m) status = 'Không xác định';
-              else if (!actualZone) status = 'Chưa được Put';
-              else if (actualZone === m.loai) status = 'Put đúng';
-              else status = 'Put sai';
+              const isStaging = !sr.location || sr.location.startsWith('FRSG') || sr.location.includes('CHO') || sr.location.includes('STAGE');
+
+              let putStatus;
+              if (isStaging) putStatus = 'Chưa được Put';
+              else if (!m) putStatus = 'Không xác định';
+              else if (!actualZone) putStatus = 'Chưa được Put';
+              else if (actualZone === m.loai) putStatus = 'Put đúng';
+              else putStatus = 'Put sai';
 
               detailRows.push({
+                lpn: sr.barcode,
                 location: sr.location,
                 barcode: sr.barcode,
                 product: (m && m.ten) || sr.product || '',
-                expectedZone: m ? m.loai : '',
-                actualZone: actualZone || (status === 'Chưa được Put' ? '— (chờ put)' : ''),
-                status,
-                qty: sr.qty
+                expectedZone: m ? m.loai : 'ĐÔNG',
+                actualZone: actualZone || (isStaging ? '— (Chờ Put)' : ''),
+                putStatus,
+                status: putStatus,
+                isStaging,
+                qty: sr.qty,
+                uom: sr.uom || '',
+                durationMinutes: 0,
+                durationFormatted: '—',
+                isOverdue: false,
+                slaStatus: '—',
+                recvFormatted: '—',
+                actFormatted: '—'
               });
             }
-
-            const zoneList = [...zoneLocations.entries()].map(([name, set]) => ({ name, count: set.size }));
-
-            lastReport = {
-              mode: 'master_stock',
-              detailRows,
-              masterSkuCount: masterMap.size,
-              zoneList,
-              generatedAt: new Date()
-            };
-
-            pieMode = 'rows';
-            activeFilter = 'all';
-            renderReportT3(lastReport);
           }
+
+          const totalLpns = detailRows.length;
+          const putDungCount = detailRows.filter(r => r.putStatus === 'Put đúng').length;
+          const putSaiCount = detailRows.filter(r => r.putStatus === 'Put sai').length;
+          const chuaPutCount = detailRows.filter(r => r.putStatus === 'Chưa được Put').length;
+          const khongXDCount = detailRows.filter(r => r.putStatus === 'Không xác định').length;
+          const overdueCount = detailRows.filter(r => r.isOverdue).length;
+          const onTimeCount = detailRows.filter(r => !r.isOverdue && (r.durationMinutes > 0 || !r.isStaging)).length;
+          const maxDurationMinutes = Math.max(...detailRows.map(r => r.durationMinutes || 0), 0);
+          const maxOverdueItem = detailRows.find(r => r.durationMinutes === maxDurationMinutes);
+
+          lastReport = {
+            hasTimeData,
+            detailRows,
+            totalLpns,
+            putDungCount,
+            putSaiCount,
+            chuaPutCount,
+            khongXDCount,
+            overdueCount,
+            onTimeCount,
+            maxDurationMinutes,
+            maxOverdueItem,
+            generatedAt: new Date()
+          };
+
+          pieView = 'put'; // Default view: Put đúng / Put sai / Chưa put
+          pieMode = 'rows';
+          activeFilter = 'all';
+          renderReportT3(lastReport);
 
         } catch (err) {
           showErr('Có lỗi khi kiểm tra đơn Put: ' + err.message);
@@ -4301,159 +4376,194 @@ function doPost(e) {
       });
 
       function renderReportT3(r) {
-        if (r.mode === 'wms') {
-          const onTimeCount = r.totalLpns - r.overdueCount;
-          const onTimePct = r.totalLpns > 0 ? ((onTimeCount / r.totalLpns) * 100).toFixed(1) : 0;
-          const overduePct = r.totalLpns > 0 ? ((r.overdueCount / r.totalLpns) * 100).toFixed(1) : 0;
+        if (!r || !r.detailRows) return;
 
-          // Time Breakdown Bins
-          let countB1 = 0, countB2 = 0, countB3 = 0, countB4 = 0;
-          let totalMinutes = 0;
-          r.detailRows.forEach(row => {
-            const m = row.durationMinutes || 0;
-            totalMinutes += m;
-            if (m <= 30) countB1++;
-            else if (m <= 60) countB2++;
-            else if (m <= 120) countB3++;
-            else countB4++;
-          });
-          const totalLpns = r.detailRows.length || 1;
-          const b1 = { count: countB1, pct: ((countB1 / totalLpns) * 100).toFixed(1) };
-          const b2 = { count: countB2, pct: ((countB2 / totalLpns) * 100).toFixed(1) };
-          const b3 = { count: countB3, pct: ((countB3 / totalLpns) * 100).toFixed(1) };
-          const b4 = { count: countB4, pct: ((countB4 / totalLpns) * 100).toFixed(1) };
-          const avgMinutes = Math.round(totalMinutes / totalLpns);
-          const avgDurationFormatted = formatDuration(avgMinutes);
-          const maxDurationFormatted = formatDuration(r.maxDurationMinutes || 0);
+        const total = r.totalLpns || 1;
+        const putDungPct = ((r.putDungCount / total) * 100).toFixed(1);
+        const putSaiPct = ((r.putSaiCount / total) * 100).toFixed(1);
+        const chuaPutPct = ((r.chuaPutCount / total) * 100).toFixed(1);
+        const onTimePct = ((r.onTimeCount / total) * 100).toFixed(1);
+        const overduePct = ((r.overdueCount / total) * 100).toFixed(1);
 
-          // Pie Chart Stats for WMS
-          const wmsOrder = ['Trễ hạn (> 30p)', 'Đang chờ (≤ 30p)', 'Put trễ (> 30p)', 'Put đúng hạn (≤ 30p)'];
-          const stats = {};
-          wmsOrder.forEach(s => stats[s] = 0);
-          let totalVal = 0;
-          r.detailRows.forEach(row => {
+        // Time bins
+        let countB1 = 0, countB2 = 0, countB3 = 0, countB4 = 0;
+        let totalMinutes = 0;
+        r.detailRows.forEach(row => {
+          const m = row.durationMinutes || 0;
+          totalMinutes += m;
+          if (m <= 30) countB1++;
+          else if (m <= 60) countB2++;
+          else if (m <= 120) countB3++;
+          else countB4++;
+        });
+        const b1 = { count: countB1, pct: ((countB1 / total) * 100).toFixed(1) };
+        const b2 = { count: countB2, pct: ((countB2 / total) * 100).toFixed(1) };
+        const b3 = { count: countB3, pct: ((countB3 / total) * 100).toFixed(1) };
+        const b4 = { count: countB4, pct: ((countB4 / total) * 100).toFixed(1) };
+        const avgMinutes = Math.round(totalMinutes / total);
+        const avgDurationFormatted = formatDuration(avgMinutes);
+        const maxDurationFormatted = formatDuration(r.maxDurationMinutes || 0);
+
+        // PIE CHART SLICES
+        let pieOrder = [];
+        if (pieView === 'sla' && r.hasTimeData) {
+          pieOrder = ['Đúng hạn (≤ 30p)', 'Trễ hạn (> 30p)'];
+        } else {
+          pieOrder = ['Put đúng', 'Put sai', 'Chưa được Put', 'Không xác định'];
+        }
+
+        const pieStats = {};
+        pieOrder.forEach(s => pieStats[s] = 0);
+        let pieTotalVal = 0;
+
+        r.detailRows.forEach(row => {
+          const key = (pieView === 'sla' && r.hasTimeData) ? row.slaStatus : row.putStatus;
+          if (pieStats[key] !== undefined) {
             const v = pieMode === 'qty' ? (row.qty || 0) : 1;
-            stats[row.status] = (stats[row.status] || 0) + v;
-            totalVal += v;
-          });
+            pieStats[key] += v;
+            pieTotalVal += v;
+          }
+        });
 
-          let acc = 0;
-          const parts = [];
-          wmsOrder.forEach(s => {
-            const v = stats[s] || 0;
-            if (v <= 0) return;
-            const start = totalVal > 0 ? (acc / totalVal) * 360 : 0;
-            acc += v;
-            const end = totalVal > 0 ? (acc / totalVal) * 360 : 0;
-            parts.push(`${STATUS_META[s].color} ${start}deg ${end}deg`);
-          });
-          const gradient = parts.length === 0 ? 'conic-gradient(#334155 0deg 360deg)' : `conic-gradient(${parts.join(', ')})`;
+        let acc = 0;
+        const parts = [];
+        pieOrder.forEach(s => {
+          const v = pieStats[s] || 0;
+          if (v <= 0) return;
+          const start = pieTotalVal > 0 ? (acc / pieTotalVal) * 360 : 0;
+          acc += v;
+          const end = pieTotalVal > 0 ? (acc / pieTotalVal) * 360 : 0;
+          const color = (STATUS_META[s] && STATUS_META[s].color) || '#64748b';
+          parts.push(`${color} ${start}deg ${end}deg`);
+        });
+        const gradient = parts.length === 0 ? 'conic-gradient(#334155 0deg 360deg)' : `conic-gradient(${parts.join(', ')})`;
 
-          const legendHtml = wmsOrder.filter(s => (stats[s] || 0) > 0).map(s => {
-            const v = stats[s] || 0;
-            const pct = totalVal > 0 ? ((v / totalVal) * 100).toFixed(1) : 0;
-            return `
-              <div class="flex items-center gap-2 cursor-pointer hover:opacity-80 transition" onclick="setT3Filter('${s}')">
-                <span class="w-3 h-3 rounded shrink-0" style="background:${STATUS_META[s].color}"></span>
-                <span class="text-slate-300 w-36 truncate font-medium">${s}:</span>
-                <span class="font-bold text-white font-mono">${v.toLocaleString()} (${pct}%)</span>
+        const legendHtml = pieOrder.filter(s => (pieStats[s] || 0) > 0).map(s => {
+          const v = pieStats[s] || 0;
+          const pct = pieTotalVal > 0 ? ((v / pieTotalVal) * 100).toFixed(1) : 0;
+          const meta = STATUS_META[s] || { color: '#64748b' };
+          let fCode = s === 'Put đúng' ? 'put_dung' : (s === 'Put sai' ? 'put_sai' : (s === 'Chưa được Put' ? 'chua_put' : (s === 'Trễ hạn (> 30p)' ? 'overdue' : (s === 'Đúng hạn (≤ 30p)' ? 'ontime' : 'all'))));
+          return `
+            <div class="flex items-center gap-2 cursor-pointer hover:opacity-80 transition py-0.5" onclick="setT3Filter('${fCode}')">
+              <span class="w-3 h-3 rounded shrink-0 shadow-sm" style="background:${meta.color}"></span>
+              <span class="text-slate-300 w-36 truncate font-medium">${s}:</span>
+              <span class="font-bold text-white font-mono">${v.toLocaleString()} (${pct}%)</span>
+            </div>
+          `;
+        }).join('') || '<div class="text-xs text-slate-500">Chưa có dữ liệu</div>';
+
+        results.innerHTML = `
+          <!-- Top Alert Banners -->
+          ${r.putSaiCount > 0 ? `
+            <div class="p-4 bg-gradient-to-r from-rose-950/90 via-slate-900 to-slate-900 border-2 border-rose-600 rounded-xl text-xs text-rose-300 flex flex-wrap items-center justify-between gap-3 shadow-xl">
+              <div class="flex items-center gap-3">
+                <span class="text-3xl animate-bounce">❌</span>
+                <div>
+                  <div class="font-black text-white text-sm tracking-wide">CẢNH BÁO: PHÁT HIỆN ${r.putSaiCount} CÂY HÀNG PUT SAI VỊ TRÍ KỆ!</div>
+                  <div class="text-rose-300 mt-0.5">Vui lòng điều phối xe nâng kiểm tra và di dời về đúng kệ quy định (Đông / Mát).</div>
+                </div>
               </div>
-            `;
-          }).join('') || '<div class="text-xs text-slate-500">Chưa có dữ liệu</div>';
+              <button onclick="setT3Filter('put_sai')" class="px-3.5 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-lg shadow transition cursor-pointer">
+                🔍 Xem ${r.putSaiCount} Cây Put Sai ➔
+              </button>
+            </div>
+          ` : ''}
 
-          results.innerHTML = `
-            <!-- Top Alert Banner if Overdue > 30m -->
-            ${r.overdueCount > 0 ? `
-              <div class="p-4 bg-gradient-to-r from-rose-950/80 via-slate-900 to-slate-900 border-2 border-rose-600 rounded-xl text-xs text-rose-300 flex flex-wrap items-center justify-between gap-3 shadow-xl">
-                <div class="flex items-center gap-3">
-                  <span class="text-3xl animate-bounce">🚨</span>
-                  <div>
-                    <div class="font-black text-white text-sm tracking-wide">CẢNH BÁO: PHÁT HIỆN ${r.overdueCount} CÂY HÀNG BỊ TRỄ HẠN (> 30 PHÚT)!</div>
-                    <div class="text-rose-300 mt-0.5">Thời gian lưu chờ lâu nhất hiện tại là: <b class="text-white underline">${formatDuration(r.maxDurationMinutes)}</b> ${r.maxOverdueItem ? `(LPN: ${r.maxOverdueItem.lpn} - ${r.maxOverdueItem.product})` : ''}</div>
+          ${r.hasTimeData && r.overdueCount > 0 ? `
+            <div class="p-3.5 bg-gradient-to-r from-amber-950/80 via-slate-900 to-slate-900 border border-amber-600/80 rounded-xl text-xs text-amber-300 flex flex-wrap items-center justify-between gap-3 shadow-md">
+              <div class="flex items-center gap-2.5">
+                <span class="text-2xl animate-pulse">⏱️</span>
+                <div>
+                  <span class="font-bold text-white">CẢNH BÁO LƯU CHỜ: Có ${r.overdueCount} cây hàng trễ hạn SLA (> 30 phút).</span>
+                  <span class="text-amber-300/80 ml-1">Lâu nhất: <b class="text-white">${formatDuration(r.maxDurationMinutes)}</b> ${r.maxOverdueItem ? `(${r.maxOverdueItem.lpn})` : ''}</span>
+                </div>
+              </div>
+              <button onclick="setT3Filter('overdue')" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-lg transition text-xs cursor-pointer">
+                Xem ${r.overdueCount} Cây Trễ ➔
+              </button>
+            </div>
+          ` : ''}
+
+          <!-- 6 KPI Cards: Put Status & SLA Time -->
+          <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div class="bg-slate-800/90 border border-slate-700 p-3.5 rounded-xl shadow-sm text-center">
+              <div class="text-[11px] text-slate-400 font-medium">Tổng Cây Hàng</div>
+              <div class="text-2xl font-black text-white mt-0.5">${r.totalLpns}</div>
+              <div class="text-[10px] text-slate-400 mt-0.5">Pallet nạp vào</div>
+            </div>
+
+            <div class="bg-slate-800/90 border border-emerald-600/60 p-3.5 rounded-xl shadow-sm bg-emerald-950/20 text-center">
+              <div class="text-[11px] text-emerald-300 font-bold">🟢 Put Đúng</div>
+              <div class="text-2xl font-black text-emerald-400 mt-0.5">${r.putDungCount}</div>
+              <div class="text-[10px] text-emerald-300 mt-0.5">${putDungPct}% đúng kệ</div>
+            </div>
+
+            <div class="bg-slate-800/90 border border-rose-600/60 p-3.5 rounded-xl shadow-sm bg-rose-950/20 text-center">
+              <div class="text-[11px] text-rose-300 font-bold">🔴 Put Sai</div>
+              <div class="text-2xl font-black text-rose-400 mt-0.5">${r.putSaiCount}</div>
+              <div class="text-[10px] text-rose-300 mt-0.5">${putSaiPct}% sai kệ</div>
+            </div>
+
+            <div class="bg-slate-800/90 border border-amber-600/60 p-3.5 rounded-xl shadow-sm bg-amber-950/20 text-center">
+              <div class="text-[11px] text-amber-300 font-bold">🟡 Chưa Được Put</div>
+              <div class="text-2xl font-black text-amber-400 mt-0.5">${r.chuaPutCount}</div>
+              <div class="text-[10px] text-amber-300 mt-0.5">${chuaPutPct}% chờ FRSG01</div>
+            </div>
+
+            <div class="bg-slate-800/90 border border-cyan-600/60 p-3.5 rounded-xl shadow-sm bg-cyan-950/20 text-center">
+              <div class="text-[11px] text-cyan-300 font-bold">Đúng SLA (≤ 30p)</div>
+              <div class="text-2xl font-black text-cyan-400 mt-0.5">${r.hasTimeData ? r.onTimeCount : '—'}</div>
+              <div class="text-[10px] text-cyan-300 mt-0.5">${r.hasTimeData ? onTimePct + '%' : 'Không có giờ'}</div>
+            </div>
+
+            <div class="bg-slate-800/90 border border-rose-600/60 p-3.5 rounded-xl shadow-sm bg-rose-950/20 text-center">
+              <div class="text-[11px] text-rose-300 font-bold">Trễ SLA (> 30p)</div>
+              <div class="text-2xl font-black text-rose-400 mt-0.5">${r.hasTimeData ? r.overdueCount : '—'}</div>
+              <div class="text-[10px] text-rose-300 mt-0.5">${r.hasTimeData ? overduePct + '%' : 'Không có giờ'}</div>
+            </div>
+          </div>
+
+          <!-- KHỐI BIỂU ĐỒ TRÒN & CỘT THỜI GIAN LƯU CHỜ SONG SONG -->
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            
+            <!-- Cột Trái: Biểu Đồ Tròn -->
+            <div class="bg-slate-800/90 border border-slate-700 p-5 rounded-xl space-y-3.5 shadow-sm">
+              <div class="flex items-center justify-between pb-2 border-b border-slate-700/60 flex-wrap gap-2">
+                <div class="flex items-center gap-2">
+                  <span class="text-lg">🥧</span>
+                  <div class="bg-slate-900 p-0.5 rounded-lg border border-slate-700 flex text-xs">
+                    <button onclick="setT3PieView('put')" class="px-2.5 py-1 rounded transition ${pieView === 'put' ? 'bg-cyan-600 text-white font-bold' : 'text-slate-400 hover:text-white'}">Vị Trí: Put Đúng / Sai</button>
+                    ${r.hasTimeData ? `<button onclick="setT3PieView('sla')" class="px-2.5 py-1 rounded transition ${pieView === 'sla' ? 'bg-cyan-600 text-white font-bold' : 'text-slate-400 hover:text-white'}">Chuẩn SLA (30p)</button>` : ''}
                   </div>
                 </div>
-                <button onclick="setT3Filter('overdue')" class="px-3.5 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-lg shadow transition cursor-pointer">
-                  🔍 Xem ${r.overdueCount} Cây Hàng Trễ ➔
-                </button>
-              </div>
-            ` : `
-              <div class="p-4 bg-emerald-950/60 border border-emerald-500/80 rounded-xl text-xs text-emerald-300 flex items-center gap-3 shadow-lg">
-                <span class="text-2xl">🎉</span>
-                <span class="font-bold text-white">XUẤT SẮC! Toàn bộ các cây hàng đều được Put đúng hạn trong vòng 30 phút.</span>
-              </div>
-            `}
 
-            <!-- 5 KPI Cards for WMS SLA Mode -->
-            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
-              <div class="bg-slate-800/90 border border-slate-700 p-4 rounded-xl shadow-sm">
-                <div class="text-xs text-slate-400 font-medium">Tổng Cây Hàng (LPN)</div>
-                <div class="text-2xl font-black text-white mt-1">${r.totalLpns}</div>
-                <div class="text-[11px] text-slate-400 mt-1">Pallet nạp vào</div>
-              </div>
-
-              <div class="bg-slate-800/90 border border-rose-600/80 p-4 rounded-xl shadow-sm bg-rose-950/20">
-                <div class="text-xs text-rose-300 font-bold flex items-center gap-1">
-                  <span>🚨</span> Trễ Hạn (> 30 Phút)
+                <div class="bg-slate-900 p-0.5 rounded-lg border border-slate-700 flex text-xs">
+                  <button onclick="setT3PieMode('rows')" class="px-2.5 py-1 rounded transition ${pieMode === 'rows' ? 'bg-emerald-600 text-white font-bold' : 'text-slate-400 hover:text-white'}">Theo Cây LPN</button>
+                  <button onclick="setT3PieMode('qty')" class="px-2.5 py-1 rounded transition ${pieMode === 'qty' ? 'bg-emerald-600 text-white font-bold' : 'text-slate-400 hover:text-white'}">Theo Số Lượng</button>
                 </div>
-                <div class="text-2xl font-black text-rose-400 mt-1">${r.overdueCount}</div>
-                <div class="text-[11px] text-rose-300 mt-1 font-semibold">${overduePct}% cây hàng trễ SLA</div>
               </div>
 
-              <div class="bg-slate-800/90 border border-amber-600/60 p-4 rounded-xl shadow-sm">
-                <div class="text-xs text-amber-300 font-medium">Chờ Tại Vị Trí FRSG01</div>
-                <div class="text-2xl font-black text-amber-400 mt-1">${r.stagingCount}</div>
-                <div class="text-[11px] text-slate-400 mt-1">${r.detailRows.filter(x => x.isStaging && x.isOverdue).length} cây ngâm > 30p</div>
-              </div>
-
-              <div class="bg-slate-800/90 border border-cyan-600/60 p-4 rounded-xl shadow-sm">
-                <div class="text-xs text-cyan-300 font-medium">Đã Lên Kệ (Rack)</div>
-                <div class="text-2xl font-black text-cyan-400 mt-1">${r.rackCount}</div>
-                <div class="text-[11px] text-slate-400 mt-1">${r.detailRows.filter(x => !x.isStaging && !x.isOverdue).length} cây lên kệ đúng hạn</div>
-              </div>
-
-              <div class="bg-slate-800/90 border border-emerald-600/60 p-4 rounded-xl shadow-sm">
-                <div class="text-xs text-emerald-300 font-medium">Tỉ Lệ Đạt Chuẩn (≤ 30p)</div>
-                <div class="text-2xl font-black text-emerald-400 mt-1">${onTimePct}%</div>
-                <div class="text-[11px] text-slate-400 mt-1">${onTimeCount} / ${r.totalLpns} đúng hạn</div>
+              <div class="flex items-center justify-center gap-8 pt-3 flex-wrap">
+                <div class="w-36 h-36 rounded-full shadow-xl border-2 border-slate-700 shrink-0" style="background:${gradient}"></div>
+                <div class="space-y-1.5 text-xs">
+                  ${legendHtml}
+                </div>
               </div>
             </div>
 
-            <!-- KHỐI BIỂU ĐỒ TRÒN & CỘT THỜI GIAN LƯU CHỜ SONG SONG -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              
-              <!-- Cột Trái: Biểu Đồ Tròn Tỉ Lệ SLA -->
-              <div class="bg-slate-800/90 border border-slate-700 p-5 rounded-xl space-y-3.5 shadow-sm">
+            <!-- Cột Phải: Cột Phân Bổ Thời Gian Lưu Chờ -->
+            <div class="bg-slate-800/90 border border-slate-700 p-5 rounded-xl space-y-3.5 shadow-sm flex flex-col justify-between">
+              <div>
                 <div class="flex items-center justify-between pb-2 border-b border-slate-700/60">
                   <div class="flex items-center gap-2">
-                    <span class="text-lg">🥧</span>
-                    <h3 class="text-sm font-bold text-white">Biểu Đồ Tròn: Tỉ Lệ SLA Trạng Thái Put</h3>
+                    <span class="text-lg">⏱️</span>
+                    <h3 class="text-sm font-bold text-white">Cột Phân Bổ Thời Gian Lưu Chờ</h3>
                   </div>
-                  <div class="bg-slate-900 p-0.5 rounded-lg border border-slate-700 flex text-xs">
-                    <button onclick="setT3PieMode('rows')" class="px-2.5 py-1 rounded transition ${pieMode === 'rows' ? 'bg-emerald-600 text-white font-bold' : 'text-slate-400 hover:text-white'}">Theo Cây LPN</button>
-                    <button onclick="setT3PieMode('qty')" class="px-2.5 py-1 rounded transition ${pieMode === 'qty' ? 'bg-emerald-600 text-white font-bold' : 'text-slate-400 hover:text-white'}">Theo Số Lượng</button>
-                  </div>
+                  <span class="text-[11px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-semibold">Chuẩn SLA: ≤ 30 phút</span>
                 </div>
 
-                <div class="flex items-center justify-center gap-8 pt-3 flex-wrap">
-                  <div class="w-36 h-36 rounded-full shadow-xl border-2 border-slate-700 shrink-0" style="background:${gradient}"></div>
-                  <div class="space-y-2 text-xs">
-                    ${legendHtml}
-                  </div>
-                </div>
-              </div>
-
-              <!-- Cột Phải: Cột Thống Kê Phân Bổ Thời Gian Lưu Chờ -->
-              <div class="bg-slate-800/90 border border-slate-700 p-5 rounded-xl space-y-3.5 shadow-sm flex flex-col justify-between">
-                <div>
-                  <div class="flex items-center justify-between pb-2 border-b border-slate-700/60">
-                    <div class="flex items-center gap-2">
-                      <span class="text-lg">⏱️</span>
-                      <h3 class="text-sm font-bold text-white">Cột Phân Bổ Thời Gian Lưu Chờ</h3>
-                    </div>
-                    <span class="text-[11px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-semibold">Chuẩn: ≤ 30 phút</span>
-                  </div>
-
-                  <div class="space-y-3 pt-3 text-xs">
+                ${r.hasTimeData ? `
+                  <div class="space-y-2.5 pt-3 text-xs">
                     <!-- Mốc 1: Dưới 30 phút -->
                     <div>
                       <div class="flex justify-between items-center mb-1">
@@ -4510,348 +4620,206 @@ function doPost(e) {
                       </div>
                     </div>
                   </div>
-                </div>
-
-                <!-- Thống kê trung bình & Lâu nhất -->
-                <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-700/60 text-xs">
-                  <div class="bg-slate-900/70 p-2.5 rounded-lg border border-slate-700/50">
-                    <span class="text-slate-400 block text-[11px]">Thời gian TB / Cây:</span>
-                    <span class="text-white font-bold text-sm font-mono">${avgDurationFormatted}</span>
+                ` : `
+                  <div class="p-6 text-center text-slate-400 text-xs space-y-1">
+                    <div>ℹ️ Nạp thêm <b>File WMS LPN</b> để hiển thị biểu đồ phân bổ thời gian lưu chờ.</div>
+                    <div class="text-slate-500">File hiện tại kiểm tra đối chiếu vị trí kệ (Put đúng / Put sai).</div>
                   </div>
-                  <div class="bg-slate-900/70 p-2.5 rounded-lg border border-slate-700/50">
-                    <span class="text-slate-400 block text-[11px]">Ngâm lâu nhất:</span>
-                    <span class="text-rose-400 font-bold text-sm font-mono truncate" title="${r.maxOverdueItem ? r.maxOverdueItem.lpn + ' - ' + r.maxOverdueItem.product : ''}">${maxDurationFormatted}</span>
-                  </div>
+                `}
+              </div>
+
+              <!-- Thống kê trung bình & Lâu nhất -->
+              <div class="grid grid-cols-2 gap-2 pt-2 border-t border-slate-700/60 text-xs">
+                <div class="bg-slate-900/70 p-2.5 rounded-lg border border-slate-700/50">
+                  <span class="text-slate-400 block text-[11px]">Thời gian TB / Cây:</span>
+                  <span class="text-white font-bold text-sm font-mono">${r.hasTimeData ? avgDurationFormatted : '—'}</span>
+                </div>
+                <div class="bg-slate-900/70 p-2.5 rounded-lg border border-slate-700/50">
+                  <span class="text-slate-400 block text-[11px]">Ngâm lâu nhất:</span>
+                  <span class="text-rose-400 font-bold text-sm font-mono truncate" title="${r.maxOverdueItem ? r.maxOverdueItem.lpn + ' - ' + r.maxOverdueItem.product : ''}">${r.hasTimeData ? maxDurationFormatted : '—'}</span>
                 </div>
               </div>
-
             </div>
 
-            <!-- Controls & Table Holder -->
-            <div class="bg-slate-800/90 border border-slate-700 rounded-xl p-4 shadow-sm space-y-3">
-              <div class="flex flex-wrap items-center justify-between gap-3">
-                <input type="text" id="t3-searchBox" placeholder="Tìm LPN, Barcode, Tên sản phẩm, Vị trí..." class="py-1.5 px-3 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white max-w-xs focus:outline-none focus:border-cyan-500" />
-                
-                <div class="flex items-center gap-1.5 flex-wrap" id="t3-filterPills">
-                  <button onclick="setT3Filter('all')" class="px-2.5 py-1 rounded-full text-xs font-semibold ${activeFilter === 'all' ? 'bg-emerald-600 text-white' : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-700'}">Tất cả (${r.totalLpns})</button>
-                  <button onclick="setT3Filter('overdue')" class="px-2.5 py-1 rounded-full text-xs font-semibold ${activeFilter === 'overdue' ? 'bg-rose-600 text-white font-bold' : 'bg-slate-900 text-rose-400 hover:text-white border border-rose-800/50'}">🔴 Trễ hạn > 30p (${r.overdueCount})</button>
-                  <button onclick="setT3Filter('ontime')" class="px-2.5 py-1 rounded-full text-xs font-semibold ${activeFilter === 'ontime' ? 'bg-emerald-600 text-white font-bold' : 'bg-slate-900 text-emerald-400 hover:text-white border border-emerald-800/50'}">🟢 Đúng hạn ≤ 30p (${onTimeCount})</button>
-                  <button onclick="setT3Filter('staging')" class="px-2.5 py-1 rounded-full text-xs font-semibold ${activeFilter === 'staging' ? 'bg-amber-600 text-white font-bold' : 'bg-slate-900 text-amber-400 hover:text-white border border-amber-800/50'}">📦 Tại FRSG01 (${r.stagingCount})</button>
-                  <button onclick="setT3Filter('rack')" class="px-2.5 py-1 rounded-full text-xs font-semibold ${activeFilter === 'rack' ? 'bg-cyan-600 text-white font-bold' : 'bg-slate-900 text-cyan-400 hover:text-white border border-cyan-800/50'}">🎯 Đã lên kệ (${r.rackCount})</button>
-                </div>
+          </div>
 
-                <button onclick="exportTool3Excel()" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 transition shadow-sm cursor-pointer">
-                  <span>⬇ Xuất Excel Báo Cáo</span>
-                </button>
+          <!-- Controls & Table Holder -->
+          <div class="bg-slate-800/90 border border-slate-700 rounded-xl p-4 shadow-sm space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <input type="text" id="t3-searchBox" placeholder="Tìm LPN, Barcode, Tên sản phẩm, Vị trí kệ..." class="py-1.5 px-3 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white max-w-xs focus:outline-none focus:border-cyan-500" />
+              
+              <div class="flex items-center gap-1.5 flex-wrap" id="t3-filterPills">
+                <button onclick="setT3Filter('all')" class="px-2.5 py-1 rounded-full text-xs font-semibold ${activeFilter === 'all' ? 'bg-emerald-600 text-white' : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-700'}">Tất cả (${r.totalLpns})</button>
+                <button onclick="setT3Filter('put_dung')" class="px-2.5 py-1 rounded-full text-xs font-semibold ${activeFilter === 'put_dung' ? 'bg-emerald-600 text-white font-bold' : 'bg-slate-900 text-emerald-400 hover:text-white border border-emerald-800/50'}">🟢 Put đúng (${r.putDungCount})</button>
+                <button onclick="setT3Filter('put_sai')" class="px-2.5 py-1 rounded-full text-xs font-semibold ${activeFilter === 'put_sai' ? 'bg-rose-600 text-white font-bold' : 'bg-slate-900 text-rose-400 hover:text-white border border-rose-800/50'}">🔴 Put sai (${r.putSaiCount})</button>
+                <button onclick="setT3Filter('chua_put')" class="px-2.5 py-1 rounded-full text-xs font-semibold ${activeFilter === 'chua_put' ? 'bg-amber-600 text-white font-bold' : 'bg-slate-900 text-amber-400 hover:text-white border border-amber-800/50'}">🟡 Chưa được Put (${r.chuaPutCount})</button>
+                ${r.hasTimeData ? `
+                  <button onclick="setT3Filter('ontime')" class="px-2.5 py-1 rounded-full text-xs font-semibold ${activeFilter === 'ontime' ? 'bg-cyan-600 text-white font-bold' : 'bg-slate-900 text-cyan-400 hover:text-white border border-cyan-800/50'}">✅ Đúng SLA ≤ 30p (${r.onTimeCount})</button>
+                  <button onclick="setT3Filter('overdue')" class="px-2.5 py-1 rounded-full text-xs font-semibold ${activeFilter === 'overdue' ? 'bg-rose-600 text-white font-bold' : 'bg-slate-900 text-rose-400 hover:text-white border border-rose-800/50'}">🚨 Trễ SLA > 30p (${r.overdueCount})</button>
+                ` : ''}
               </div>
 
-              <div id="t3-tableHolder" class="overflow-x-auto max-h-[500px] custom-scrollbar border border-slate-700 rounded-lg"></div>
-            </div>
-          `;
-
-          document.getElementById('t3-searchBox').addEventListener('input', refreshTableT3);
-          refreshTableT3();
-
-        } else {
-          // Legacy Mode: Master Data + Stock
-          results.innerHTML = `
-            <div class="bg-slate-800/90 border border-slate-700 p-4 rounded-xl flex gap-6 text-xs text-slate-300 flex-wrap">
-              <span>Tổng mã Master Data: <b>${r.masterSkuCount.toLocaleString()}</b></span>
-              ${r.zoneList.map(z => `<span>Khu <b>${z.name}</b>: <b>${z.count.toLocaleString()}</b> vị trí</span>`).join('')}
+              <button onclick="exportTool3Excel()" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 transition shadow-sm cursor-pointer">
+                <span>⬇ Xuất Excel Báo Cáo</span>
+              </button>
             </div>
 
-            <div id="t3-kpiHolder" class="grid grid-cols-2 sm:grid-cols-4 gap-3.5"></div>
+            <div id="t3-tableHolder" class="overflow-x-auto max-h-[500px] custom-scrollbar border border-slate-700 rounded-lg"></div>
+          </div>
+        `;
 
-            <div class="bg-slate-800/90 border border-slate-700 p-5 rounded-xl space-y-4">
-              <div id="t3-pieHolder"></div>
-            </div>
-
-            <div class="bg-slate-800/90 border border-slate-700 rounded-xl p-4 shadow-sm space-y-3">
-              <div class="flex flex-wrap items-center justify-between gap-3">
-                <input type="text" id="t3-searchBox" placeholder="Tìm Barcode, Tên hàng, Vị trí..." class="py-1.5 px-3 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white max-w-xs" />
-                <div class="flex items-center gap-1.5 flex-wrap" id="t3-filterPills"></div>
-                <button onclick="exportTool3Excel()" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition">⬇ Xuất Excel</button>
-              </div>
-
-              <div id="t3-tableHolder" class="overflow-x-auto max-h-96 custom-scrollbar border border-slate-700 rounded-lg"></div>
-            </div>
-          `;
-
-          document.getElementById('t3-searchBox').addEventListener('input', refreshTableT3);
-          renderPillsAndKpiT3Legacy();
-          refreshTableT3();
-        }
+        document.getElementById('t3-searchBox').addEventListener('input', refreshTableT3);
+        refreshTableT3();
       }
 
-      function renderPillsAndKpiT3Legacy() {
-        if (!lastReport || lastReport.mode !== 'master_stock') return;
-        const legacyOrder = ['Put đúng', 'Put sai', 'Chưa được Put', 'Không xác định'];
-        const stats = {};
-        legacyOrder.forEach(s => stats[s] = 0);
-        let total = 0;
-        lastReport.detailRows.forEach(r => {
-          const v = pieMode === 'qty' ? (r.qty || 0) : 1;
-          stats[r.status] = (stats[r.status] || 0) + v;
-          total += v;
-        });
-
-        const kpiHtml = legacyOrder.map(s => {
-          const v = stats[s] || 0;
-          const pct = total > 0 ? ((v / total) * 100).toFixed(1) : 0;
-          const meta = STATUS_META[s];
-          return `
-            <div class="bg-slate-800/90 border border-slate-700 p-4 rounded-xl text-center">
-              <div class="text-2xl font-black" style="color:${meta.color}">${v.toLocaleString()}</div>
-              <div class="text-xs text-slate-400 mt-1">${s} (${pct}%)</div>
-            </div>
-          `;
-        }).join('');
-        document.getElementById('t3-kpiHolder').innerHTML = kpiHtml;
-
-        const pillsHtml = ['<button onclick="setT3Filter(\'all\')" class="px-2.5 py-1 rounded-full text-xs font-semibold ' + (activeFilter === 'all' ? 'bg-emerald-600 text-white' : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-700') + '">Tất cả</button>'];
-        legacyOrder.forEach(s => {
-          pillsHtml.push(`<button onclick="setT3Filter('${s}')" class="px-2.5 py-1 rounded-full text-xs font-semibold ${activeFilter === s ? 'bg-emerald-600 text-white' : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-700'}">${s}</button>`);
-        });
-        document.getElementById('t3-filterPills').innerHTML = pillsHtml.join('');
-
-        // Pie chart for legacy mode
-        let acc = 0;
-        const parts = [];
-        legacyOrder.forEach(s => {
-          const v = stats[s] || 0;
-          if (v <= 0) return;
-          const start = total > 0 ? (acc / total) * 360 : 0;
-          acc += v;
-          const end = total > 0 ? (acc / total) * 360 : 0;
-          parts.push(`${STATUS_META[s].color} ${start}deg ${end}deg`);
-        });
-        const gradient = parts.length === 0 ? 'conic-gradient(#334155 0deg 360deg)' : `conic-gradient(${parts.join(', ')})`;
-        const pieEl = document.getElementById('t3-pieHolder');
-        if (pieEl) {
-          pieEl.innerHTML = `
-            <div class="flex items-center justify-between pb-2 border-b border-slate-700/60 mb-3">
-              <div class="flex items-center gap-2">
-                <span class="text-lg">🥧</span>
-                <h3 class="text-sm font-bold text-white">Biểu Đồ Tròn: Tỉ Lệ Trạng Thái Put</h3>
-              </div>
-              <div class="bg-slate-900 p-0.5 rounded-lg border border-slate-700 flex text-xs">
-                <button onclick="setT3PieMode('rows')" class="px-2.5 py-1 rounded transition ${pieMode === 'rows' ? 'bg-emerald-600 text-white font-bold' : 'text-slate-400 hover:text-white'}">Theo Dòng</button>
-                <button onclick="setT3PieMode('qty')" class="px-2.5 py-1 rounded transition ${pieMode === 'qty' ? 'bg-emerald-600 text-white font-bold' : 'text-slate-400 hover:text-white'}">Theo Số Lượng</button>
-              </div>
-            </div>
-            <div class="flex items-center justify-center gap-8 py-2 flex-wrap">
-              <div class="w-36 h-36 rounded-full shadow-xl border-2 border-slate-700 shrink-0" style="background:${gradient}"></div>
-              <div class="space-y-2 text-xs">
-                ${legacyOrder.filter(s => (stats[s] || 0) > 0).map(s => {
-                  const v = stats[s] || 0;
-                  const pct = total > 0 ? ((v / total) * 100).toFixed(1) : 0;
-                  return `
-                    <div class="flex items-center gap-2 cursor-pointer hover:opacity-80 transition" onclick="setT3Filter('${s}')">
-                      <span class="w-3 h-3 rounded shrink-0" style="background:${STATUS_META[s].color}"></span>
-                      <span class="text-slate-300 font-medium">${s}:</span>
-                      <span class="font-bold text-white">${v.toLocaleString()} (${pct}%)</span>
-                    </div>
-                  `;
-                }).join('')}
-              </div>
-            </div>
-          `;
-        }
-      }
+      window.setT3PieView = function(view) {
+        pieView = view;
+        if (lastReport) renderReportT3(lastReport);
+      };
 
       window.setT3PieMode = function(mode) {
         pieMode = mode;
-        if (lastReport) {
-          if (lastReport.mode === 'master_stock') renderPillsAndKpiT3Legacy();
-          else renderReportT3(lastReport);
-        }
+        if (lastReport) renderReportT3(lastReport);
       };
 
       window.setT3Filter = function(filter) {
         activeFilter = filter;
-        if (lastReport) {
-          if (lastReport.mode === 'master_stock') renderPillsAndKpiT3Legacy();
-          else renderReportT3(lastReport);
-        }
+        if (lastReport) renderReportT3(lastReport);
       };
 
       function refreshTableT3() {
-        if (!lastReport) return;
+        if (!lastReport || !lastReport.detailRows) return;
         const search = normStr(document.getElementById('t3-searchBox').value);
 
-        if (lastReport.mode === 'wms') {
-          const filtered = lastReport.detailRows.filter(r => {
-            if (activeFilter === 'overdue' && !r.isOverdue) return false;
-            if (activeFilter === 'ontime' && r.isOverdue) return false;
-            if (activeFilter === 'staging' && !r.isStaging) return false;
-            if (activeFilter === 'rack' && r.isStaging) return false;
-            if (activeFilter !== 'all' && activeFilter !== 'overdue' && activeFilter !== 'ontime' && activeFilter !== 'staging' && activeFilter !== 'rack') {
-              if (r.status !== activeFilter) return false;
-            }
-            if (search) {
-              const hay = normStr(r.lpn + ' ' + r.barcode + ' ' + r.product + ' ' + r.location);
-              if (!hay.includes(search)) return false;
-            }
-            return true;
-          });
+        const filtered = lastReport.detailRows.filter(r => {
+          if (activeFilter === 'put_dung' && r.putStatus !== 'Put đúng') return false;
+          if (activeFilter === 'put_sai' && r.putStatus !== 'Put sai') return false;
+          if (activeFilter === 'chua_put' && r.putStatus !== 'Chưa được Put') return false;
+          if (activeFilter === 'ontime' && (!lastReport.hasTimeData || r.isOverdue)) return false;
+          if (activeFilter === 'overdue' && (!lastReport.hasTimeData || !r.isOverdue)) return false;
+          if (activeFilter !== 'all' && activeFilter !== 'put_dung' && activeFilter !== 'put_sai' && activeFilter !== 'chua_put' && activeFilter !== 'ontime' && activeFilter !== 'overdue') {
+            if (r.putStatus !== activeFilter && r.slaStatus !== activeFilter) return false;
+          }
+          if (search) {
+            const hay = normStr(`${r.lpn} ${r.barcode} ${r.product} ${r.location} ${r.expectedZone} ${r.actualZone} ${r.putStatus} ${r.slaStatus}`);
+            if (!hay.includes(search)) return false;
+          }
+          return true;
+        });
 
-          const rowsHtml = filtered.slice(0, 1500).map(r => {
-            const isStaging = r.isStaging;
-            const locBadge = isStaging 
-              ? `<span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold">${r.location} (Chờ Put)</span>`
-              : `<span class="px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-bold">${r.location}</span>`;
+        const rowsHtml = filtered.slice(0, 2000).map(r => {
+          const locBadge = r.isStaging
+            ? `<span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold">${r.location} (Chờ Put)</span>`
+            : `<span class="px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-bold font-mono">${r.location}</span>`;
 
-            const slaBadge = r.isOverdue
-              ? `<span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-950 text-rose-300 border border-rose-600 animate-pulse">🚨 Trễ hạn (> 30p)</span>`
-              : `<span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-600">✅ Đúng hạn (≤ 30p)</span>`;
+          let putBadge = '';
+          if (r.putStatus === 'Put đúng') {
+            putBadge = `<span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-500 shadow-sm">✅ Put đúng</span>`;
+          } else if (r.putStatus === 'Put sai') {
+            putBadge = `<span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-950 text-rose-300 border border-rose-500 animate-pulse shadow-sm">❌ Put sai</span>`;
+          } else if (r.putStatus === 'Chưa được Put') {
+            putBadge = `<span class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-950 text-amber-300 border border-amber-500 shadow-sm">⏳ Chưa được Put</span>`;
+          } else {
+            putBadge = `<span class="px-2 py-0.5 rounded-full text-[11px] bg-slate-800 text-slate-400 border border-slate-700">Chưa xác định</span>`;
+          }
 
-            const durClass = r.isOverdue ? 'text-rose-400 font-black' : 'text-emerald-400 font-bold';
+          let slaBadge = '—';
+          if (lastReport.hasTimeData) {
+            slaBadge = r.isOverdue
+              ? `<span class="px-2 py-0.5 rounded text-[11px] font-bold bg-rose-950/90 text-rose-300 border border-rose-600 animate-pulse">🚨 Trễ > 30p</span>`
+              : `<span class="px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-950/90 text-emerald-300 border border-emerald-600">✅ Đúng hạn</span>`;
+          }
 
-            return `
-              <tr class="hover:bg-slate-800/80 transition">
-                <td class="py-2.5 px-3 font-mono font-bold text-cyan-300 select-all">${r.lpn}</td>
-                <td class="py-2.5 px-3 font-mono text-slate-300">${r.barcode || '—'}</td>
-                <td class="py-2.5 px-3 max-w-xs truncate text-white font-medium" title="${r.product}">${r.product}</td>
-                <td class="py-2.5 px-3 whitespace-nowrap">${locBadge}</td>
-                <td class="py-2.5 px-3 text-right font-mono font-semibold">${r.qty ? r.qty.toLocaleString() : '0'} <span class="text-slate-400 text-[10px]">${r.uom}</span></td>
-                <td class="py-2.5 px-3 text-slate-300 font-mono text-[11px] whitespace-nowrap">${r.recvFormatted}</td>
-                <td class="py-2.5 px-3 text-slate-300 font-mono text-[11px] whitespace-nowrap">${r.actFormatted}</td>
-                <td class="py-2.5 px-3 font-mono text-xs whitespace-nowrap ${durClass}">${r.durationFormatted}</td>
-                <td class="py-2.5 px-3 whitespace-nowrap">${slaBadge}</td>
-              </tr>
-            `;
-          }).join('');
+          const durClass = r.isOverdue ? 'text-rose-400 font-black' : (r.durationMinutes > 0 ? 'text-emerald-400 font-bold' : 'text-slate-400');
 
-          document.getElementById('t3-tableHolder').innerHTML = `
-            <table class="w-full text-left text-xs whitespace-nowrap">
-              <thead class="bg-slate-950 text-slate-300 sticky top-0 border-b border-slate-700 z-10">
-                <tr>
-                  <th class="py-2.5 px-3">Mã LPN (Pallet)</th>
-                  <th class="py-2.5 px-3">Mã Barcode</th>
-                  <th class="py-2.5 px-3">Tên Sản Phẩm</th>
-                  <th class="py-2.5 px-3">Vị Trí Hiện Tại</th>
-                  <th class="py-2.5 px-3 text-right">Số Lượng</th>
-                  <th class="py-2.5 px-3">Giờ Nhận (Received)</th>
-                  <th class="py-2.5 px-3">Giờ Thao Tác (Last Activity)</th>
-                  <th class="py-2.5 px-3">Thời Gian Nằm / Lên Kệ</th>
-                  <th class="py-2.5 px-3">Đánh Giá SLA (30 Phút)</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-slate-800">${rowsHtml}</tbody>
-            </table>
+          return `
+            <tr class="hover:bg-slate-800/80 transition">
+              <td class="py-2.5 px-3 font-mono font-bold text-cyan-300 select-all">${r.lpn}</td>
+              <td class="py-2.5 px-3 font-mono text-slate-300">${r.barcode || '—'}</td>
+              <td class="py-2.5 px-3 max-w-xs truncate text-white font-medium" title="${r.product}">${r.product}</td>
+              <td class="py-2.5 px-3 whitespace-nowrap">${locBadge}</td>
+              <td class="py-2.5 px-3 text-slate-300 text-center font-medium">${r.expectedZone || '—'}</td>
+              <td class="py-2.5 px-3 text-slate-300 text-center font-medium">${r.actualZone || '—'}</td>
+              <td class="py-2.5 px-3 whitespace-nowrap text-center">${putBadge}</td>
+              <td class="py-2.5 px-3 font-mono text-xs whitespace-nowrap text-center ${durClass}">${r.durationFormatted}</td>
+              <td class="py-2.5 px-3 whitespace-nowrap text-center">${slaBadge}</td>
+              <td class="py-2.5 px-3 text-right font-mono font-semibold">${r.qty ? r.qty.toLocaleString() : '0'} <span class="text-slate-400 text-[10px]">${r.uom}</span></td>
+              <td class="py-2.5 px-3 text-slate-300 font-mono text-[11px] whitespace-nowrap">${r.recvFormatted}</td>
+              <td class="py-2.5 px-3 text-slate-300 font-mono text-[11px] whitespace-nowrap">${r.actFormatted}</td>
+            </tr>
           `;
+        }).join('');
 
-        } else {
-          // Legacy Mode Table
-          const filtered = lastReport.detailRows.filter(r => {
-            if (activeFilter !== 'all' && r.status !== activeFilter) return false;
-            if (search) {
-              const hay = normStr(r.barcode + ' ' + r.product + ' ' + r.location);
-              if (!hay.includes(search)) return false;
-            }
-            return true;
-          });
-
-          const rowsHtml = filtered.slice(0, 1500).map(r => {
-            const meta = STATUS_META[r.status] || STATUS_META['Không xác định'];
-            return `
-              <tr class="hover:bg-slate-800/80">
-                <td class="py-2 px-3 font-mono font-bold text-cyan-300">${r.location}</td>
-                <td class="py-2 px-3 font-mono">${r.barcode}</td>
-                <td class="py-2 px-3 max-w-xs truncate text-white" title="${r.product}">${r.product}</td>
-                <td class="py-2 px-3 text-slate-300">${r.expectedZone}</td>
-                <td class="py-2 px-3 text-slate-300">${r.actualZone}</td>
-                <td class="py-2 px-3"><span class="px-2 py-0.5 rounded-full text-[10px] font-bold border ${meta.badge}">${r.status}</span></td>
-                <td class="py-2 px-3 text-right font-mono">${r.qty ? r.qty.toLocaleString() : ''}</td>
+        document.getElementById('t3-tableHolder').innerHTML = `
+          <table class="w-full text-left text-xs whitespace-nowrap">
+            <thead class="bg-slate-950 text-slate-300 sticky top-0 border-b border-slate-700 z-10">
+              <tr>
+                <th class="py-2.5 px-3">Mã LPN (Pallet)</th>
+                <th class="py-2.5 px-3">Mã Barcode</th>
+                <th class="py-2.5 px-3">Tên Sản Phẩm</th>
+                <th class="py-2.5 px-3">Vị Trí Hiện Tại</th>
+                <th class="py-2.5 px-3 text-center">Khu Chuẩn</th>
+                <th class="py-2.5 px-3 text-center">Khu Thực Tế</th>
+                <th class="py-2.5 px-3 text-center">Đánh Giá Vị Trí Put</th>
+                <th class="py-2.5 px-3 text-center">Thời Gian Lưu / Put</th>
+                <th class="py-2.5 px-3 text-center">Đánh Giá SLA (30p)</th>
+                <th class="py-2.5 px-3 text-right">Số Lượng</th>
+                <th class="py-2.5 px-3">Giờ Nhận (Received)</th>
+                <th class="py-2.5 px-3">Giờ Thao Tác (Last Activity)</th>
               </tr>
-            `;
-          }).join('');
-
-          document.getElementById('t3-tableHolder').innerHTML = `
-            <table class="w-full text-left text-xs whitespace-nowrap">
-              <thead class="bg-slate-950 text-slate-300 sticky top-0 border-b border-slate-700">
-                <tr>
-                  <th class="py-2 px-3">Vị Trí Kệ</th>
-                  <th class="py-2 px-3">Mã Hàng</th>
-                  <th class="py-2 px-3">Tên Sản Phẩm</th>
-                  <th class="py-2 px-3">Loại Hàng Master</th>
-                  <th class="py-2 px-3">Khu Vực Hiện Tại</th>
-                  <th class="py-2 px-3">Trạng Thái</th>
-                  <th class="py-2 px-3 text-right">Số Lượng</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-slate-800">${rowsHtml}</tbody>
-            </table>
-          `;
-        }
+            </thead>
+            <tbody class="divide-y divide-slate-800">${rowsHtml}</tbody>
+          </table>
+        `;
       }
 
       window.exportTool3Excel = function() {
-        if (!lastReport) return;
+        if (!lastReport || !lastReport.detailRows) return;
         const wb = XLSX.utils.book_new();
 
-        if (lastReport.mode === 'wms') {
-          const aoa = [
-            ['BÁO CÁO KIỂM TRA THỜI GIAN PUT & LƯU VỊ TRÍ CHỜ KHO ĐÔNG (SLA 30 PHÚT)'],
-            ['Ngày xuất báo cáo:', new Date().toLocaleString('vi-VN')],
-            ['Tổng số cây hàng LPN:', lastReport.totalLpns],
-            ['Số cây hàng trễ hạn (> 30p):', lastReport.overdueCount],
-            ['Tỉ lệ trễ hạn:', `${((lastReport.overdueCount / (lastReport.totalLpns || 1)) * 100).toFixed(1)}%`],
-            [],
-            [
-              'Mã LPN (Pallet)', 'Mã Barcode', 'Tên Sản Phẩm', 'Vị Trí Hiện Tại', 
-              'Trạng Thái Vị Trí', 'Số Lượng', 'Đơn Vị', 'Giờ Nhận (Received)', 
-              'Giờ Thao Tác (Last Activity)', 'Thời Gian Đang Nằm / Lên Kệ', 
-              'Thời Gian (Phút)', 'Đánh Giá SLA (Ngưỡng 30p)', 'Số Phút Quá Hạn'
-            ]
-          ];
+        const aoa = [
+          ['BÁO CÁO KIỂM TRA ĐƠN PUT & THỜI GIAN LƯU CHỜ KHO ĐÔNG (SLA 30 PHÚT)'],
+          ['Ngày xuất báo cáo:', new Date().toLocaleString('vi-VN')],
+          ['Tổng số cây hàng:', lastReport.totalLpns],
+          ['Put đúng:', lastReport.putDungCount, 'Put sai:', lastReport.putSaiCount, 'Chưa được Put (FRSG01):', lastReport.chuaPutCount],
+          lastReport.hasTimeData ? ['Đúng hạn SLA (≤ 30p):', lastReport.onTimeCount, 'Trễ hạn SLA (> 30p):', lastReport.overdueCount] : [],
+          [],
+          [
+            'Mã LPN (Pallet)', 'Mã Barcode', 'Tên Sản Phẩm', 'Vị Trí Hiện Tại', 
+            'Khu Vực Chuẩn', 'Khu Vực Thực Tế', 'Đánh Giá Vị Trí Put', 
+            'Thời Gian Lưu / Put', 'Đánh Giá SLA (30 Phút)', 'Số Lượng', 'Đơn Vị', 
+            'Giờ Nhận (Received)', 'Giờ Thao Tác (Last Activity)'
+          ]
+        ];
 
-          lastReport.detailRows.forEach(r => {
-            const overdueMin = Math.max(0, r.durationMinutes - 30);
-            aoa.push([
-              r.lpn,
-              r.barcode,
-              r.product,
-              r.location,
-              r.isStaging ? 'Vị trí chờ (FRSG01)' : 'Đã lên kệ',
-              r.qty,
-              r.uom,
-              r.recvFormatted,
-              r.actFormatted,
-              r.durationFormatted,
-              r.durationMinutes,
-              r.isOverdue ? 'TRỄ HẠN (> 30p)' : 'ĐÚNG HẠN (≤ 30p)',
-              overdueMin
-            ]);
-          });
+        lastReport.detailRows.forEach(r => {
+          aoa.push([
+            r.lpn || '',
+            r.barcode || '',
+            r.product || '',
+            r.location || '',
+            r.expectedZone || '',
+            r.actualZone || '',
+            r.putStatus || '',
+            r.durationFormatted || '',
+            r.slaStatus || '',
+            r.qty || 0,
+            r.uom || '',
+            r.recvFormatted || '',
+            r.actFormatted || ''
+          ]);
+        });
 
-          const ws = XLSX.utils.aoa_to_sheet(aoa);
-          XLSX.utils.book_append_sheet(wb, ws, 'Theo Doi SLA Put 30P');
-          const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-          const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-          const link = document.createElement('a');
-          link.href = URL.createObjectURL(blob);
-          link.download = `Bao_Cao_SLA_Put_30Phut_${new Date().toISOString().slice(0, 10)}.xlsx`;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-
-        } else {
-          const aoa = [['Vị Trí Kệ', 'Mã Hàng', 'Tên Sản Phẩm', 'Loại Hàng Master', 'Khu Vực Hiện Tại', 'Trạng Thái', 'Số Lượng']];
-          lastReport.detailRows.forEach(r => {
-            aoa.push([r.location, r.barcode, r.product, r.expectedZone, r.actualZone, r.status, r.qty]);
-          });
-          const ws = XLSX.utils.aoa_to_sheet(aoa);
-          XLSX.utils.book_append_sheet(wb, ws, 'Kiem Tra Don Put');
-          const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-          const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-          const link = document.createElement('a');
-          link.href = URL.createObjectURL(blob);
-          link.download = `Kiem_Tra_Don_Put_Kho_Dong.xlsx`;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-        }
+        const ws = XLSX.utils.aoa_to_sheet(aoa);
+        XLSX.utils.book_append_sheet(wb, ws, 'Bao Cao Kiem Tra Put');
+        const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+        const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `Bao_Cao_Kiem_Tra_Put_${new Date().toISOString().slice(0, 10)}.xlsx`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
       };
 
     })();
