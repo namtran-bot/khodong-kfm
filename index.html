@@ -3764,6 +3764,7 @@ function doPost(e) {
     (function initTool3() {
       const state = { files: [] };
       let lastReport = null;
+      let pieView = 'put';
       let pieMode = 'rows';
       let activeFilter = 'all';
       let uid = 0;
@@ -4246,10 +4247,6 @@ function doPost(e) {
         }
         return rows;
       }
-
-      let pieView = 'put'; // 'put' (Put Đúng/Sai/Chưa Put) hoặc 'sla' (Đúng hạn ≤ 30p / Trễ hạn > 30p)
-      let pieMode = 'rows'; // 'rows' hoặc 'qty'
-      let activeFilter = 'all';
 
       generateBtn.addEventListener('click', () => {
         try {
