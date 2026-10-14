@@ -163,6 +163,15 @@
           <span>📥</span>
           <span>3. Kiểm Tra Đơn Put</span>
         </button>
+
+        <button 
+          id="navBtnInOut" 
+          onclick="switchMainTab('tab-inout')"
+          class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white flex items-center gap-1.5 transition"
+        >
+          <span>🔄</span>
+          <span>4. Quản Lý Nhập - Xuất</span>
+        </button>
       </nav>
 
       <!-- Global Actions -->
@@ -680,6 +689,456 @@
     </div>
 
     <!-- ========================================================================= -->
+    <!-- TAB 4: QUẢN LÝ NHẬP - XUẤT KHO (INBOUND & IN-OUT BALANCE)                 -->
+    <!-- ========================================================================= -->
+    <div id="tab-inout" class="main-tab-content hidden space-y-6">
+      
+      <!-- Top Title Banner -->
+      <div class="bg-gradient-to-r from-blue-950 via-slate-900 to-indigo-950 border border-indigo-700/50 rounded-2xl p-5 shadow-xl flex flex-wrap items-center justify-between gap-4">
+        <div class="flex items-center gap-3.5">
+          <div class="w-12 h-12 rounded-xl bg-indigo-500/20 border border-indigo-400/40 flex items-center justify-center text-2xl shadow-inner">
+            🔄
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h2 class="text-lg font-bold text-white tracking-wide">QUẢN LÝ & CÂN ĐỐI NHẬP - XUẤT KHO ĐÔNG</h2>
+              <span class="px-2 py-0.5 text-[10px] font-black rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">REAL-TIME WMS</span>
+            </div>
+            <p class="text-xs text-slate-300 mt-1">
+              Đồng bộ dữ liệu phiếu nhập (PR/PO) từ Google Sheets hoặc File Excel $\leftrightarrow$ Tự động liên kết dữ liệu Xuất kho (Wave WMS)
+            </p>
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex items-center gap-2 text-xs flex-wrap">
+          <button onclick="openInboundPasteModal()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 rounded-lg font-semibold flex items-center gap-1.5 transition cursor-pointer">
+            <span>📋 Dán Dữ Liệu Nhanh</span>
+          </button>
+          <button onclick="exportInOutExcelReport()" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg flex items-center gap-1.5 shadow-md transition cursor-pointer">
+            <span>⬇ Xuất Báo Cáo Nhập - Xuất (.xlsx)</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- INBOUND DATA INPUT SECTION: GOOGLE SHEET & DROPZONE -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        
+        <!-- Box 1: Google Sheet Live Link Connection (7 cols) -->
+        <div class="lg:col-span-7 bg-slate-800/80 border border-slate-700/80 rounded-2xl p-5 space-y-3.5 shadow-sm">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="text-emerald-400 text-base">📊</span>
+              <h3 class="text-sm font-bold text-white">Đồng Bộ Real-Time Từ Google Sheets Nhập Kho</h3>
+            </div>
+            <span id="inboundGSheetStatusBadge" class="text-[10px] px-2 py-0.5 rounded-full bg-slate-700 text-slate-300 border border-slate-600">Sẵn sàng</span>
+          </div>
+          
+          <p class="text-xs text-slate-400">
+            Dán đường link Google Sheet chứa các phiếu nhập (PR/PO). Khi bạn sửa trạng thái phiếu (*Phiếu tạm $\rightarrow$ Đã nhận*), chỉ cần bấm <b>"Đồng bộ ngay"</b> là Dashboard lập tức cập nhật:
+          </p>
+
+          <div class="flex gap-2">
+            <input 
+              type="url" 
+              id="inboundGSheetUrlInput" 
+              class="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs font-mono text-slate-200 focus:outline-none focus:border-indigo-500" 
+              placeholder="https://docs.google.com/spreadsheets/d/.../edit"
+            />
+            <button 
+              id="btnSyncInboundSheet"
+              onclick="syncInboundGoogleSheet()" 
+              class="px-4 py-2 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white font-bold rounded-xl text-xs flex items-center gap-2 transition shadow-md shrink-0 cursor-pointer"
+            >
+              <svg id="syncInboundSpinner" class="hidden animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+              </svg>
+              <span>⚡ Đồng Bộ Ngay</span>
+            </button>
+          </div>
+
+          <div class="flex items-center justify-between text-[11px] text-slate-400 pt-1">
+            <span id="inboundLastSyncText">Lần đồng bộ gần nhất: Đã nạp dữ liệu mẫu</span>
+            <button onclick="openGSheetGuideModal()" class="text-indigo-300 hover:text-indigo-200 underline font-medium cursor-pointer">Hướng dẫn kết nối Google Sheet ➔</button>
+          </div>
+        </div>
+
+        <!-- Box 2: Dropzone & Local Backup Storage (5 cols) -->
+        <div class="lg:col-span-5 bg-slate-800/80 border border-slate-700/80 rounded-2xl p-5 flex flex-col justify-between space-y-3 shadow-sm">
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <div class="flex items-center gap-2">
+                <span class="text-amber-400 text-base">📂</span>
+                <h3 class="text-sm font-bold text-white">Thả File Excel / CSV Nhập Hàng</h3>
+              </div>
+              <span id="inboundStoredBadge" class="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 font-bold">0 phiếu</span>
+            </div>
+            
+            <!-- Mini Dropzone -->
+            <div 
+              id="inboundDropzone" 
+              class="border-2 border-dashed border-slate-600 hover:border-indigo-400 rounded-xl bg-slate-900/60 p-4 text-center cursor-pointer transition py-4"
+              onclick="document.getElementById('inboundFileInput').click()"
+            >
+              <input type="file" id="inboundFileInput" accept=".xlsx,.xls,.csv" multiple class="hidden" onchange="handleInboundFiles(this.files)" />
+              <div class="text-2xl mb-1">📥</div>
+              <div class="text-xs font-semibold text-slate-200">
+                Kéo thả file phiếu nhập (PR/PO) vào đây, hoặc <span class="text-indigo-400 underline">chọn file</span>
+              </div>
+              <div class="text-[11px] text-slate-400 mt-1">Tự động cộng dồn vào bộ nhớ, không mất ngày cũ</div>
+            </div>
+          </div>
+
+          <!-- Backup & Restore Actions -->
+          <div class="flex items-center justify-between pt-2 border-t border-slate-700/70 text-xs">
+            <button onclick="backupInboundData()" class="text-slate-300 hover:text-white flex items-center gap-1 font-medium transition cursor-pointer" title="Tải file sao lưu dữ liệu nhập về máy">
+              <span>💾 Sao Lưu (.json)</span>
+            </button>
+            <label class="text-slate-300 hover:text-white flex items-center gap-1 font-medium transition cursor-pointer" title="Nạp lại bản sao lưu">
+              <span>📂 Phục Hồi</span>
+              <input type="file" accept=".json" class="hidden" onchange="restoreInboundData(event)">
+            </label>
+            <button onclick="clearInboundData()" class="text-rose-400 hover:text-rose-300 flex items-center gap-1 font-medium transition cursor-pointer" title="Xóa toàn bộ dữ liệu nhập để làm lại từ đầu">
+              <span>🗑️ Xóa Tất Cả</span>
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- FILTER TOOLBAR -->
+      <div class="bg-slate-800/90 border border-slate-700/80 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 shadow-sm">
+        <div class="flex flex-wrap items-center gap-2.5 text-xs">
+          <!-- Time Preset Buttons -->
+          <span class="text-slate-400 font-semibold text-[11px] uppercase">Lọc Ngày Nhận:</span>
+          <button onclick="setInboundFilterDate('ALL')" id="btnInFilterAll" class="px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-bold transition">Tất cả</button>
+          <button onclick="setInboundFilterDate('TODAY')" id="btnInFilterToday" class="px-2.5 py-1 rounded-lg bg-slate-900 text-slate-300 hover:text-white border border-slate-700 font-medium transition">Hôm nay</button>
+          <button onclick="setInboundFilterDate('7DAYS')" id="btnInFilter7Days" class="px-2.5 py-1 rounded-lg bg-slate-900 text-slate-300 hover:text-white border border-slate-700 font-medium transition">7 ngày qua</button>
+
+          <!-- Custom Date Input -->
+          <div class="flex items-center gap-1.5 bg-slate-950 border border-slate-700 px-2 py-0.5 rounded-lg ml-1">
+            <span class="text-slate-400 text-[11px]">Chọn ngày:</span>
+            <input type="date" id="inboundCustomDate" onchange="setInboundFilterCustomDate(this.value)" class="bg-transparent text-slate-200 text-xs focus:outline-none" />
+          </div>
+
+          <!-- Supplier Filter -->
+          <div class="flex items-center gap-1.5 bg-slate-950 border border-slate-700 px-2.5 py-1 rounded-lg">
+            <span class="text-slate-400 text-[11px]">NCC:</span>
+            <select id="inboundSupplierSelect" onchange="applyInboundFilters()" class="bg-transparent text-slate-200 text-xs focus:outline-none max-w-[170px] truncate">
+              <option value="ALL">Tất cả Nhà Cung Cấp</option>
+            </select>
+          </div>
+
+          <!-- Status Filter -->
+          <div class="flex items-center gap-1.5 bg-slate-950 border border-slate-700 px-2.5 py-1 rounded-lg">
+            <span class="text-slate-400 text-[11px]">Trạng thái:</span>
+            <select id="inboundStatusSelect" onchange="applyInboundFilters()" class="bg-transparent text-slate-200 text-xs focus:outline-none">
+              <option value="ALL">Tất cả trạng thái</option>
+              <option value="TEMPORARY">Phiếu tạm (Chờ nhận)</option>
+              <option value="RECEIVED">Đã nhập kho / Hoàn tất</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Search Bar -->
+        <div class="flex items-center gap-2">
+          <div class="relative w-full sm:w-64">
+            <input 
+              type="text" 
+              id="inboundSearchInput" 
+              oninput="applyInboundFilters()" 
+              placeholder="Tìm kiếm PR, PO, Tên hàng, NCC..." 
+              class="w-full bg-slate-950 border border-slate-700 rounded-xl pl-8 pr-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+            />
+            <span class="absolute left-2.5 top-2 text-slate-500 text-xs">🔍</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- KPI COMPARISON SECTION: INBOUND VS OUTBOUND VS BALANCE -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        
+        <!-- Card 1: Tổng Nhập (Inbound) -->
+        <div class="bg-gradient-to-br from-slate-800 to-slate-900 border border-indigo-500/40 rounded-2xl p-4 shadow-sm relative overflow-hidden">
+          <div class="flex items-center justify-between text-xs font-semibold text-indigo-300">
+            <span>📥 TỔNG NHẬP KHO (INBOUND)</span>
+            <span id="kpiInboundPrCount" class="px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-bold border border-indigo-500/30">0 PR</span>
+          </div>
+          <div class="mt-2.5">
+            <div class="flex items-baseline gap-2">
+              <div class="text-2xl font-black text-white" id="kpiInboundTotalReceived">0</div>
+              <span class="text-xs text-slate-400">/ <span id="kpiInboundTotalPO">0</span> Đặt (PO)</span>
+            </div>
+            <div class="text-xs text-emerald-400 mt-1 font-semibold flex items-center justify-between">
+              <span>Đạt: <b id="kpiInboundFulfillmentRate">0%</b></span>
+              <span class="text-slate-400 text-[11px]" id="kpiInboundWeight">0 KG | 0 CBM</span>
+            </div>
+          </div>
+          <div class="mt-3 pt-2 border-t border-slate-700/60 flex items-center justify-between text-[11px] text-slate-400">
+            <span>⏳ Phiếu tạm: <b class="text-amber-300" id="kpiInboundPendingCount">0</b></span>
+            <span>✅ Hoàn tất: <b class="text-emerald-300" id="kpiInboundCompletedCount">0</b></span>
+          </div>
+        </div>
+
+        <!-- Card 2: Tổng Xuất (Outbound - Wave WMS) -->
+        <div class="bg-gradient-to-br from-slate-800 to-slate-900 border border-cyan-500/40 rounded-2xl p-4 shadow-sm relative overflow-hidden">
+          <div class="flex items-center justify-between text-xs font-semibold text-cyan-300">
+            <span>📤 TỔNG XUẤT KHO (OUTBOUND)</span>
+            <span id="kpiOutboundWaveCount" class="px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-500/30">0 Wave</span>
+          </div>
+          <div class="mt-2.5">
+            <div class="flex items-baseline gap-2">
+              <div class="text-2xl font-black text-white" id="kpiOutboundTotalPicked">0</div>
+              <span class="text-xs text-slate-400">/ <span id="kpiOutboundTotalDemand">0</span> Y/C</span>
+            </div>
+            <div class="text-xs text-cyan-400 mt-1 font-semibold flex items-center justify-between">
+              <span>Tỷ lệ đáp ứng: <b id="kpiOutboundRate">0%</b></span>
+              <span class="text-rose-400 text-[11px]">Rớt: <b id="kpiOutboundDropped">0</b> sp</span>
+            </div>
+          </div>
+          <div class="mt-3 pt-2 border-t border-slate-700/60 flex items-center justify-between text-[11px] text-slate-400">
+            <span>Đã Allocate: <b class="text-slate-200" id="kpiOutboundAllocated">0</b></span>
+            <span>Tự động map từ Wave</span>
+          </div>
+        </div>
+
+        <!-- Card 3: Cân Đối Dòng Hàng (Net Inventory Flow) -->
+        <div class="bg-gradient-to-br from-slate-800 to-slate-900 border border-emerald-500/40 rounded-2xl p-4 shadow-sm relative overflow-hidden" id="cardNetFlow">
+          <div class="flex items-center justify-between text-xs font-semibold text-emerald-300">
+            <span>⚖️ CÂN ĐỐI DÒNG HÀNG (NET FLOW)</span>
+            <span id="kpiNetFlowBadge" class="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">Cân bằng</span>
+          </div>
+          <div class="mt-2.5">
+            <div class="text-2xl font-black text-emerald-300" id="kpiNetUnits">0</div>
+            <div class="text-xs text-slate-300 mt-1" id="kpiNetStatusText">
+              Nhập thực tế vs Xuất thực pick
+            </div>
+          </div>
+          <div class="mt-3 pt-2 border-t border-slate-700/60 flex items-center justify-between text-[11px] text-slate-400">
+            <span id="kpiNetDescription">Kho duy trì ổn định</span>
+            <span>ĐVT: Sản phẩm</span>
+          </div>
+        </div>
+
+        <!-- Card 4: Chất Lượng Giao & Claim NCC -->
+        <div class="bg-gradient-to-br from-slate-800 to-slate-900 border border-amber-500/40 rounded-2xl p-4 shadow-sm relative overflow-hidden">
+          <div class="flex items-center justify-between text-xs font-semibold text-amber-300">
+            <span>⚠️ CHẤT LƯỢNG GIAO & CLAIM NCC</span>
+            <span id="kpiClaimCountBadge" class="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold border border-amber-500/30">0 đơn claim</span>
+          </div>
+          <div class="mt-2.5">
+            <div class="flex items-baseline gap-2">
+              <div class="text-2xl font-black text-amber-400" id="kpiTotalClaimQty">0</div>
+              <span class="text-xs text-slate-400">sản phẩm claim</span>
+            </div>
+            <div class="text-xs text-amber-300/80 mt-1 flex items-center justify-between">
+              <span>Tỷ lệ claim: <b id="kpiAvgClaimRate">0%</b></span>
+              <span>Hao hụt: <b id="kpiTotalLossQty">0</b> sp</span>
+            </div>
+          </div>
+          <div class="mt-3 pt-2 border-t border-slate-700/60 flex items-center justify-between text-[11px] text-slate-400">
+            <span id="kpiTopClaimSupplier">Chưa có vi phạm</span>
+            <span>NCC cần lưu ý</span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- VISUAL COMPARISON CHART: IN VS OUT BY DAY -->
+      <div class="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-5 shadow-sm space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+              <span>📊</span>
+              <span>Biểu Đồ So Sánh Sản Lượng: Nhập Kho (Thực Nhận) vs Xuất Kho (Thực Pick) Theo Ngày</span>
+            </h3>
+            <p class="text-xs text-slate-400 mt-0.5">
+              Cột tím/indigo (Nhập hàng thực tế) đứng cạnh cột cyan/xanh (Xuất hàng thực tế) giúp giám sát lưu lượng dòng kho theo từng ngày
+            </p>
+          </div>
+
+          <!-- Chart legend -->
+          <div class="flex items-center gap-4 text-xs font-semibold">
+            <div class="flex items-center gap-1.5 text-indigo-400">
+              <span class="w-3 h-3 rounded-sm bg-indigo-500 inline-block"></span>
+              <span>Nhập Thực Nhận (PR)</span>
+            </div>
+            <div class="flex items-center gap-1.5 text-cyan-400">
+              <span class="w-3 h-3 rounded-sm bg-cyan-500 inline-block"></span>
+              <span>Xuất Thực Pick (Wave)</span>
+            </div>
+            <div class="flex items-center gap-1.5 text-emerald-400">
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block"></span>
+              <span>Net Flow (+/-)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- SVG Dynamic In-Out Chart Container -->
+        <div class="h-64 w-full bg-slate-900/80 rounded-xl p-3 border border-slate-700/60 relative flex items-center justify-center overflow-hidden" id="inoutChartContainer">
+          <!-- Rendered dynamically by javascript -->
+        </div>
+      </div>
+
+      <!-- TAB VIEW CONTROLS & MAIN TABLE -->
+      <div class="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-5 shadow-sm space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-700/80 pb-3">
+          <!-- Sub-view switcher -->
+          <div class="flex items-center gap-2 bg-slate-950 p-1 rounded-xl border border-slate-700 text-xs font-semibold">
+            <button 
+              id="btnSubViewInbound" 
+              onclick="switchInOutSubView('inbound')" 
+              class="px-3.5 py-1.5 rounded-lg bg-indigo-600 text-white shadow-sm flex items-center gap-1.5 transition cursor-pointer"
+            >
+              <span>📋</span>
+              <span>1. Chi Tiết Phiếu Nhập Kho (Inbound)</span>
+            </button>
+            <button 
+              id="btnSubViewBalance" 
+              onclick="switchInOutSubView('balance')" 
+              class="px-3.5 py-1.5 rounded-lg text-slate-400 hover:text-white flex items-center gap-1.5 transition cursor-pointer"
+            >
+              <span>⚖️</span>
+              <span>2. Bảng Đối Chiếu Cân Đối Nhập - Xuất Theo Ngày</span>
+            </button>
+          </div>
+
+          <div class="text-xs text-slate-400" id="inoutTableSummaryCount">
+            Hiển thị 0 dòng
+          </div>
+        </div>
+
+        <!-- VIEW 1: INBOUND DETAILS TABLE -->
+        <div id="subViewInboundTableWrapper" class="overflow-x-auto custom-scrollbar">
+          <table class="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr class="border-b border-slate-700 text-slate-400 uppercase text-[10px] tracking-wider bg-slate-900/60">
+                <th class="py-3 px-3">STT</th>
+                <th class="py-3 px-3">Mã PR</th>
+                <th class="py-3 px-3">Mã PO</th>
+                <th class="py-3 px-3">Trạng Thái</th>
+                <th class="py-3 px-3">Ngày Nhận / Dự Kiến</th>
+                <th class="py-3 px-3">Nhà Cung Cấp</th>
+                <th class="py-3 px-3">Tên Hàng Hóa</th>
+                <th class="py-3 px-3">ĐVT</th>
+                <th class="py-3 px-3 text-right">SL PO (Đặt)</th>
+                <th class="py-3 px-3 text-right">SL PR (Thực Nhận)</th>
+                <th class="py-3 px-3 text-right">KG Thực Nhận</th>
+                <th class="py-3 px-3 text-right">Tỷ Lệ Nhận</th>
+                <th class="py-3 px-3 text-center">Claim / Lỗi</th>
+              </tr>
+            </thead>
+            <tbody id="inboundTableBody" class="divide-y divide-slate-700/50">
+              <!-- Dynamically rendered -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- VIEW 2: DAILY BALANCE TABLE -->
+        <div id="subViewBalanceTableWrapper" class="overflow-x-auto custom-scrollbar hidden">
+          <table class="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr class="border-b border-slate-700 text-slate-400 uppercase text-[10px] tracking-wider bg-slate-900/60">
+                <th class="py-3 px-3">Ngày Vận Hành</th>
+                <th class="py-3 px-3 text-center">Số Phiếu Nhập</th>
+                <th class="py-3 px-3 text-right text-indigo-300">Tổng SL Đặt (PO)</th>
+                <th class="py-3 px-3 text-right text-indigo-400 font-bold">Tổng Thực Nhận (PR)</th>
+                <th class="py-3 px-3 text-right text-indigo-300">Khối Lượng KG</th>
+                <th class="py-3 px-3 text-center">Số Wave Xuất</th>
+                <th class="py-3 px-3 text-right text-cyan-300">Tổng Yêu Cầu Xuất</th>
+                <th class="py-3 px-3 text-right text-cyan-400 font-bold">Tổng Thực Pick Xuất</th>
+                <th class="py-3 px-3 text-right font-black">Chênh Lệch Ròng (Net Flow)</th>
+                <th class="py-3 px-3 text-center">Đánh Giá Biến Động Kho</th>
+              </tr>
+            </thead>
+            <tbody id="balanceTableBody" class="divide-y divide-slate-700/50">
+              <!-- Dynamically rendered -->
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- POPUP MODAL: QUICK PASTE INBOUND DATA (DÁN DỮ LIỆU GOOGLE SHEET NHANH) -->
+    <div id="inboundPasteModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden no-print">
+      <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto custom-scrollbar">
+        <div class="flex items-center justify-between border-b border-slate-700 pb-3">
+          <div class="flex items-center gap-2.5">
+            <div class="w-9 h-9 rounded-xl bg-indigo-500/20 border border-indigo-400/40 flex items-center justify-center text-indigo-300 font-bold text-lg">
+              📋
+            </div>
+            <div>
+              <h3 class="text-base font-bold text-white">Dán Nhanh Dữ Liệu Từ Google Sheets / Excel</h3>
+              <p class="text-xs text-slate-400">Copy các dòng dữ liệu trên Google Sheet hoặc Excel rồi dán (Ctrl+V) vào đây</p>
+            </div>
+          </div>
+          <button onclick="closeInboundPasteModal()" class="w-8 h-8 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 flex items-center justify-center transition">✕</button>
+        </div>
+
+        <div class="space-y-2">
+          <label class="block text-xs font-semibold text-slate-300">Nội dung dữ liệu (Bao gồm dòng tiêu đề hoặc dữ liệu thô):</label>
+          <textarea 
+            id="inboundPasteTextarea" 
+            rows="8" 
+            class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs font-mono text-slate-200 focus:outline-none focus:border-indigo-500" 
+            placeholder="Dán dữ liệu copy từ Google Sheet hoặc CSV vào đây..."
+          ></textarea>
+        </div>
+
+        <div class="flex items-center justify-between pt-2">
+          <span class="text-[11px] text-slate-400">Hệ thống tự động nhận diện các cột chuẩn WMS</span>
+          <div class="flex items-center gap-2">
+            <button onclick="closeInboundPasteModal()" class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-xs font-semibold">Hủy</button>
+            <button onclick="processInboundPastedText()" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold shadow-md">
+              ⚡ Xác Nhận Nạp Dữ Liệu
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- POPUP MODAL: GOOGLE SHEETS SETUP GUIDE -->
+    <div id="gsheetGuideModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden no-print">
+      <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-xl w-full p-6 shadow-2xl space-y-4">
+        <div class="flex items-center justify-between border-b border-slate-700 pb-3">
+          <div class="flex items-center gap-2">
+            <span class="text-xl">💡</span>
+            <h3 class="text-base font-bold text-white">Cách Kết Nối Google Sheet Real-Time</h3>
+          </div>
+          <button onclick="closeGSheetGuideModal()" class="w-8 h-8 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 flex items-center justify-center transition">✕</button>
+        </div>
+
+        <div class="space-y-3 text-xs text-slate-300">
+          <div class="bg-slate-900/60 p-3 rounded-xl border border-slate-700 space-y-2">
+            <p class="font-bold text-indigo-300">Cách 1: Chia Sẻ Đường Link Xem (Cực Nhanh - 15 giây)</p>
+            <ol class="list-decimal pl-4 space-y-1 text-slate-400">
+              <li>Mở file Google Sheet chứa phiếu nhập kho của bạn.</li>
+              <li>Bấm nút <b>Chia sẻ (Share)</b> ở góc trên bên phải.</li>
+              <li>Tại mục <i>Quyền truy cập chung</i>, chọn <b>Bất kỳ ai có đường liên kết (Anyone with the link)</b> $\rightarrow$ Quyền <b>Người xem</b>.</li>
+              <li>Bấm <b>Sao chép đường liên kết (Copy link)</b> rồi dán vào ô trên Dashboard.</li>
+            </ol>
+          </div>
+
+          <div class="bg-slate-900/60 p-3 rounded-xl border border-slate-700 space-y-2">
+            <p class="font-bold text-emerald-300">Cách 2: Xuất Bản Lên Web Dạng CSV (Chuẩn Nhất - 30 giây)</p>
+            <ol class="list-decimal pl-4 space-y-1 text-slate-400">
+              <li>Trên Google Sheet, vào <b>Tệp (File)</b> $\rightarrow$ <b>Chia sẻ (Share)</b> $\rightarrow$ <b>Xuất bản lên web (Publish to web)</b>.</li>
+              <li>Tại ô định dạng, chọn <b>Giá trị phân tách bằng dấu phẩy (.csv)</b>.</li>
+              <li>Bấm <b>Xuất bản (Publish)</b> rồi copy đường link dán vào ô trên Dashboard.</li>
+            </ol>
+          </div>
+        </div>
+
+        <div class="flex justify-end pt-2">
+          <button onclick="closeGSheetGuideModal()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold">Đã Hiểu</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================================================= -->
     <!-- POPUP MODAL: WAVE DETAIL (WITH OVER-STOCK TABLE & RECON SECTION)          -->
     <!-- ========================================================================= -->
     <div id="detailModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden no-print">
@@ -1117,7 +1576,8 @@ STT,TÊN WAVE ,SỐ PT,LOẠI ĐƠN ,NGÀY ĐI HÀNG ,TRẠNG THÁI ,SHORT,TỔN
         'tab-dashboard': 'navBtnDashboard',
         'tab-tool1': 'navBtnTool1',
         'tab-tool2': 'navBtnTool2',
-        'tab-tool3': 'navBtnTool3'
+        'tab-tool3': 'navBtnTool3',
+        'tab-inout': 'navBtnInOut'
       };
 
       Object.values(btnMap).forEach(btnId => {
@@ -1135,6 +1595,9 @@ STT,TÊN WAVE ,SỐ PT,LOẠI ĐƠN ,NGÀY ĐI HÀNG ,TRẠNG THÁI ,SHORT,TỔN
         }
       }
 
+      if (targetTabId === 'tab-inout') {
+        if (typeof renderInOutTab === 'function') renderInOutTab();
+      }
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
@@ -1314,6 +1777,7 @@ STT,TÊN WAVE ,SỐ PT,LOẠI ĐƠN ,NGÀY ĐI HÀNG ,TRẠNG THÁI ,SHORT,TỔN
         initDateRangeInputs();
         applyFilters();
         updateHeaderReconBadge();
+        if (typeof renderInOutTab === 'function') renderInOutTab();
       }
     }
 
@@ -5023,9 +5487,1102 @@ STT,TÊN WAVE ,SỐ PT,LOẠI ĐƠN ,NGÀY ĐI HÀNG ,TRẠNG THÁI ,SHORT,TỔN
 
     })();
 
+    // =========================================================================
+    // MODULE: TAB 4 - QUẢN LÝ NHẬP - XUẤT KHO (INBOUND & IN-OUT BALANCE)
+    // =========================================================================
+    const InOutModule = (function() {
+      const STORAGE_KEY_INBOUND = 'kfm_inbound_items_v1';
+      const STORAGE_KEY_GSHEET = 'kfm_inbound_gsheet_url';
+
+      const SAMPLE_INBOUND_CSV = `Mã PR,Mã PO,Trạng thái,Tên viết tắt,Chi nhánh,Ngày giao hàng dự kiến,Ngày giao hàng NCC xác nhận,Ngày nhận hàng,Người nhận,Mã nhà cung cấp,Tên nhà cung cấp,Tổng tiền (-VAT),Giảm giá phiếu nhập,Tổng giá trị VAT,Tổng tiền (+VAT),Ghi chú,Tổng số lượng,Tổng số mặt hàng,Mã nội bộ,Mã hàng,Tên hàng,ĐVT,Khóa nhập,NSX,HSD,Số lượng PO,Số thùng đặt,Số CBM đặt,Giá PO,Số lượng PR (thực nhận),SL nhận (NCC giao),SL claim NCC,Tỷ lệ claim (%),Hình thức claim,Tỷ lệ QC (%),Tỷ lệ hỗ trợ (%),Tỷ lệ MD deal (%),SL hao hụt,Tỷ lệ hao hụt (%),Hình thức tính hao hụt,Số thùng nhận,Số CBM nhận,Giá PR,Thành tiền (-VAT),Khối lượng dự kiến nhận (KG),Khối lượng thực nhận (KG),Hàng quá cảnh,Barcode bị xoá khỏi PR,Số lượng lưu khai trương (Đặt),Số lượng lưu khai trương (Thực tế),Kho lưu hàng khai trương,Số lượng lưu siêu thị sỉ (Đặt),Số lượng lưu siêu thị sỉ  (Thực tế),Khu vực lưu siêu thị sỉ,Số lượng lưu CPG (Đặt),Số lượng lưu CPG  (Thực tế),Khu vực lưu CPG,Mã phiếu chuyển,Ngày cập nhật,Người cập nhật,Thời gian tạo,Người tạo
+PR1002675591,PO1002675591,Phiếu tạm,FZA50101,FZA50101 _ Sóng Thần _ Lưu Hàng,15/10/2026 12:00:00,15/10/2026 12:00:00,,,V002125,CÔNG TY TNHH 365 FRESH FOODS,0,0,0,0,,0,1,1001001028924,8936239090050,365 FRESH FOODS - BA CHỈ BÒ MỸ TÚI ZIP 500G,TÚI,,,,1200,40,0.001,125000,0,,,,,,,,,,,0,0,125000,0,600,0,Không,NO,0,0,,0,0,,0,0,,,13/10/2026 16:51:54,Đỗ thị ngọc hồng,13/10/2026 16:51:54,Đỗ thị ngọc hồng
+PR1002674082,PO1002674082,Phiếu tạm,FZA50101,FZA50101 _ Sóng Thần _ Lưu Hàng,14/10/2026 15:43:06,15/10/2026 15:43:06,,,V000030,CÔNG TY TNHH BÁN LẺ SONG MÃ,0,0,0,0,,0,8,1001001024241,8935297103726,BIBIGO - BÁNH RÁN KIỂU HÀN QUỐC HOTTEOK MOZZARELLA 300G,GÓI,,,,312,13,0.256,58908.6,0,,,,,,,,,,,0,0,58908.6,0,87.36,0,Không,NO,0,0,,0,0,,0,0,,,14/10/2026 09:48:11,Võ Hoàng Phúc,12/10/2026 15:44:42,Võ Hoàng Phúc
+PR1002674082,PO1002674082,Phiếu tạm,FZA50101,FZA50101 _ Sóng Thần _ Lưu Hàng,14/10/2026 15:43:06,15/10/2026 15:43:06,,,V000030,CÔNG TY TNHH BÁN LẺ SONG MÃ,0,0,0,0,,0,8,1001001029974,8934717402432,BIBIGO - BÁNH XẾP KIỂU HÀN QUỐC 365 HẢI SẢN THẬP CẨM 250G (COMBO 1+1),GÓI,,,,1000,50,1.71,50173.5,0,,,,,,,,,,,0,0,50173.5,0,500,0,Không,NO,0,0,,0,0,,0,0,,,14/10/2026 09:48:11,Võ Hoàng Phúc,12/10/2026 15:44:42,Võ Hoàng Phúc
+PR1002674082,PO1002674082,Phiếu tạm,FZA50101,FZA50101 _ Sóng Thần _ Lưu Hàng,14/10/2026 15:43:06,15/10/2026 15:43:06,,,V000030,CÔNG TY TNHH BÁN LẺ SONG MÃ,0,0,0,0,,0,8,1001001004449,8934717401336,BIBIGO - BÁNH XẾP MANDU NHÂN HẢI SẢN 350G,GÓI,,,,272,17,0.217,45215.1,0,,,,,,,,,,,0,0,45215.1,0,95.2,0,Không,NO,0,0,,0,0,,0,0,,,14/10/2026 09:48:11,Võ Hoàng Phúc,12/10/2026 15:44:42,Võ Hoàng Phúc
+PR1002674082,PO1002674082,Phiếu tạm,FZA50101,FZA50101 _ Sóng Thần _ Lưu Hàng,14/10/2026 15:43:06,15/10/2026 15:43:06,,,V000030,CÔNG TY TNHH BÁN LẺ SONGMÃ,0,0,0,0,,0,8,1001001004450,8934717401350,BIBIGO - BÁNH XẾP MANDU NHÂN THỊT VÀ BẮP 350G,GÓI,,,,96,6,0.082,42989.4,0,,,,,,,,,,,0,0,42989.4,0,33.6,0,Không,NO,0,0,,0,0,,0,0,,,14/10/2026 09:48:11,Võ Hoàng Phúc,12/10/2026 15:44:42,Võ Hoàng Phúc
+PR1002674082,PO1002674082,Phiếu tạm,FZA50101,FZA50101 _ Sóng Thần _ Lưu Hàng,14/10/2026 15:43:06,15/10/2026 15:43:06,,,V000030,CÔNG TY TNHH BÁN LẺ SONG MÃ,0,0,0,0,,0,8,1001001011157,8934717266003,CJ CẦU TRE - CHẢ GIÒ BÁNH RẾ HẢI SẢN 500G,GÓI,,,,240,20,0.291,56057.4,0,,,,,,,,,,,0,0,56057.4,0,120,0,Không,NO,0,0,,0,0,,0,0,,,14/10/2026 09:48:11,Võ Hoàng Phúc,12/10/2026 15:44:42,Võ Hoàng Phúc
+PR1002674082,PO1002674082,Phiếu tạm,FZA50101,FZA50101 _ Sóng Thần _ Lưu Hàng,14/10/2026 15:43:06,15/10/2026 15:43:06,,,V000030,CÔNG TY TNHH BÁN LẺ SONG MÃ,0,0,0,0,,0,8,1001001029973,8934717266713,CJ CẦU TRE - CHẢ GIÒ DA GẠO HẢI SẢN 400G,GÓI,,,,300,25,0.331,55958.4,0,,,,,,,,,,,0,0,55958.4,0,120,0,Không,NO,0,0,,0,0,,0,0,,,14/10/2026 09:48:11,Võ Hoàng Phúc,12/10/2026 15:44:42,Võ Hoàng Phúc
+PR1002674082,PO1002674082,Phiếu tạm,FZA50101,FZA50101 _ Sóng Thần _ Lưu Hàng,14/10/2026 15:43:06,15/10/2026 15:43:06,,,V000030,CÔNG TY TNHH BÁN LẺ SONG MÃ,0,0,0,0,,0,8,1001001016798,8934717275081,CJ CẦU TRE - HÁ CẢO NHÂN TÔM CẢI BÓ XÔI 300G,GÓI,,,,448,16,0.443,50675.4,0,,,,,,,,,,,0,0,50675.4,0,134.4,0,Không,NO,0,0,,0,0,,0,0,,,14/10/2026 09:48:11,Võ Hoàng Phúc,12/10/2026 15:44:42,Võ Hoàng Phúc
+PR1002674082,PO1002674082,Phiếu tạm,FZA50101,FZA50101 _ Sóng Thần _ Lưu Hàng,14/10/2026 15:43:06,15/10/2026 15:43:06,,,V000030,CÔNG TY TNHH BÁN LẺ SONG MÃ,0,0,0,0,,0,8,1001001026262,8934717472008,CJ CẦU TRE - LẨU THẢ LONG CUNG 300G,GÓI,,,,414,23,0.704,33381.6,0,,,,,,,,,,,0,0,33381.6,0,124.2,0,Không,NO,0,0,,0,0,,0,0,,,14/10/2026 09:48:11,Võ Hoàng Phúc,12/10/2026 15:44:42,Võ Hoàng Phúc
+PR1002671484,PO1002671484,Phiếu tạm,FZA50101,FZA50101 _ Sóng Thần _ Lưu Hàng,10/10/2026 12:00:00,15/10/2026 12:00:00,,,V001405,CÔNG TY CỔ PHẦN THƯƠNG MẠI HI-FOODS,0,0,0,0,,0,1,1001001004456,8936077110286,BAMBOO - HÁ CẢO BABY 300G,GÓI,,,,420,15,0.284,29707.6,0,,,,,,,,,,,0,0,29707.6,0,126,0,Không,NO,0,0,,0,0,,0,0,,,13/10/2026 12:51:13,Võ Hoàng Phúc,09/10/2026 14:43:02,Võ Hoàng Phúc
+PR1002668075,PO1002668075,Phiếu tạm,FZA50101,FZA50101 _ Sóng Thần _ Lưu Hàng,10/10/2026 12:00:00,15/10/2026 12:00:00,,,V001405,CÔNG TY CỔ PHẦN THƯƠNG MẠI HI-FOODS,0,0,0,0,,0,14,1001001027852,8936077113829,BAMBOO - BÁNH BAO GẠO LỨT NHÂN THỊT BÒ PHÔ MAI 40G*6,GÓI,,,,198,11,0.216,44817.5,0,,,,,,,,,,,0,0,44817.5,0,47.52,0,Không,NO,0,0,,0,0,,0,0,,,13/10/2026 12:51:27,Võ Hoàng Phúc,06/10/2026 15:54:45,Võ Hoàng Phúc
+PR1002668075,PO1002668075,Phiếu tạm,FZA50101,FZA50101 _ Sóng Thần _ Lưu Hàng,10/10/2026 12:00:00,15/10/2026 12:00:00,,,V001405,CÔNG TY CỔ PHẦN THƯƠNG MẠI HI-FOODS,0,0,0,0,,0,14,1001001004418,8936077110262,BAMBOO - BÁNH BAO KIM SA 240G,GÓI,,,,700,35,0.491,30653.2,0,,,,,,,,,,,0,0,30653.2,0,168,0,Không,NO,0,0,,0,0,,0,0,,,13/10/2026 12:51:27,Võ Hoàng Phúc,06/10/2026 15:54:45,Võ Hoàng Phúc
+PR1002668075,PO1002668075,Phiếu tạm,FZA50101,FZA50101 _ Sóng Thần _ Lưu Hàng,10/10/2026 12:00:00,15/10/2026 12:00:00,,,V001405,CÔNG TY CỔ PHẦN THƯƠNG MẠI HI-FOODS,0,0,0,0,,0,14,1001001004446,8936077110279,BAMBOO - BÁNH CUỐN HẢI SẢN 250G,GÓI,,,,576,18,0.389,38710.5,0,,,,,,,,,,,0,0,38710.5,0,144,0,Không,NO,0,0,,0,0,,0,0,,,13/10/2026 12:51:27,Võ Hoàng Phúc,06/10/2026 15:54:45,Võ Hoàng Phúc
+PR1002668075,PO1002668075,Phiếu tạm,FZA50101,FZA50101 _ Sóng Thần _ Lưu Hàng,10/10/2026 12:00:00,15/10/2026 12:00:00,,,V001405,CÔNG TY CỔ PHẦN THƯƠNG MẠI HI-FOODS,0,0,0,0,,0,14,1001001004456,8936077110286,BAMBOO - HÁ CẢO BABY 300G,GÓI,,,,616,22,0.416,29707.6,0,,,,,,,,,,,0,0,29707.6,0,184.8,0,Không,NO,0,0,,0,0,,0,0,,,13/10/2026 12:51:27,Võ Hoàng Phúc,06/10/2026 15:54:45,Võ Hoàng Phúc
+PR1002668075,PO1002668075,Phiếu tạm,FZA50101,FZA50101 _ Sóng Thần _ Lưu Hàng,10/10/2026 12:00:00,15/10/2026 12:00:00,,,V001405,CÔNG TY CỔ PHẦN THƯƠNG MẠI HI-FOODS,0,0,0,0,,0,14,1001001004459,8936077110132,BAMBOO - HÁ CẢO TÔM 270G,GÓI,,,,2016,84,1.361,40188,0,,,,,,,,,,,0,0,40188,0,544.32,0,Không,NO,0,0,,0,0,,0,0,,,13/10/2026 12:51:27,Võ Hoàng Phúc,06/10/2026 15:54:45,Võ Hoàng Phúc
+PR1002668075,PO1002668075,Phiếu tạm,FZA50101,FZA50101 _ Sóng Thần _ Lưu Hàng,10/10/2026 12:00:00,15/10/2026 12:00:00,,,V001405,CÔNG TY CỔ PHẦN THƯƠNG MẠI HI-FOODS,0,0,0,0,,0,14,1001001004463,8936077110187,BAMBOO - HOÀNH THÁNH TÔM THỊT 220G,GÓI,,,,2016,72,1.361,31421.5,0,,,,,,,,,,,0,0,31421.5,0,443.52,0,Không,NO,0,0,,0,0,,0,0,,,13/10/2026 12:51:27,Võ Hoàng Phúc,06/10/2026 15:54:45,Võ Hoàng Phúc
+PR1002668075,PO1002668075,Phiếu tạm,FZA50101,FZA50101 _ Sóng Thần _ Lưu Hàng,10/10/2026 12:00:00,15/10/2026 12:00:00,,,V001405,CÔNG TY CỔ PHẦN THƯƠNG MẠI HI-FOODS,0,0,0,0,,0,14,1001001004464,8936077110071,BAMBOO - XÍU MẠI TÔM 300G,GÓI,,,,624,26,0.421,47083,0,,,,,,,,,,,0,0,47083,0,187.2,0,Không,NO,0,0,,0,0,,0,0,,,13/10/2026 12:51:27,Võ Hoàng Phúc,06/10/2026 15:54:45,Võ Hoàng Phúc
+PR1002668075,PO1002668075,Phiếu tạm,FZA50101,FZA50101 _ Sóng Thần _ Lưu Hàng,10/10/2026 12:00:00,15/10/2026 12:00:00,,,V001405,CÔNG TY CỔ PHẦN THƯƠNG MẠI HI-FOODS,0,0,0,0,,0,14,1001001028859,8936077113690,BON - BÁNH MÌ BƠ TỎI PHÔ MAI 180G (45G*4),HỘP,,,,100,5,0.095,44916,0,,,,,,,,,,,0,0,44916,0,18,0,Không,NO,0,0,,0,0,,0,0,,,13/10/2026 12:51:27,Võ Hoàng Phúc,06/10/2026 15:54:45,Võ Hoàng Phúc
+PR1002668075,PO1002668075,Phiếu tạm,FZA50101,FZA50101 _ Sóng Thần _ Lưu Hàng,10/10/2026 12:00:00,15/10/2026 12:00:00,,,V001405,CÔNG TY CỔ PHẦN THƯƠNG MẠI HI-FOODS,0,0,0,0,,0,14,1001001030646,8936077113683,BON - CALZONE - PIZZA GẬP THỊT 180G (90G*2),HỘP,,,,500,25,0.476,28589.625,0,,,,,,,,,,,0,0,28589.625,0,90,0,Không,NO,0,0,,0,0,,0,0,,,13/10/2026 12:51:27,Võ Hoàng Phúc,06/10/2026 15:54:45,Võ Hoàng Phúc
+PR1002668075,PO1002668075,Phiếu tạm,FZA50101,FZA50101 _ Sóng Thần _ Lưu Hàng,10/10/2026 12:00:00,15/10/2026 12:00:00,,,V001405,CÔNG TY CỔ PHẦN THƯƠNG MẠI HI-FOODS,0,0,0,0,,0,14,1001001030705,8936077114918,KINGxBON - HÁ CẢO HẢI SẢN 250G,GÓI,,,,504,28,0.434,33243.75,0,,,,,,,,,,,0,0,33243.75,0,126,0,Không,NO,0,0,,0,0,,0,0,,,13/10/2026 12:51:27,Võ Hoàng Phúc,06/10/2026 15:54:45,Võ Hoàng Phúc
+PR1002668075,PO1002668075,Phiếu tạm,FZA50101,FZA50101 _ Sóng Thần _ Lưu Hàng,10/10/2026 12:00:00,15/10/2026 12:00:00,,,V001405,CÔNG TY CỔ PHẦN THƯƠNG MẠI HI-FOODS,0,0,0,0,,0,14,1001001024404,8936077113232,KINGxBON - PIZZA HẢI SẢN 220G,CÁI,,,,108,9,0.105,50629,0,,,,,,,,,,,0,0,50629,0,23.76,0,Không,NO,0,0,,0,0,,0,0,,,13/10/2026 12:51:27,Võ Hoàng Phúc,06/10/2026 15:54:45,Võ Hoàng Phúc
+PR1002668075,PO1002668075,Phiếu tạm,FZA50101,FZA50101 _ Sóng Thần _ Lưu Hàng,10/10/2026 12:00:00,15/10/2026 12:00:00,,,V001405,CÔNG TY CỔ PHẦN THƯƠNG MẠI HI-FOODS,0,0,0,0,,0,14,1001001024405,8936077113287,KINGxBON - PIZZA PHÔ MAI ĐẶC BIỆT 120G,CÁI,,,,832,52,0.721,27087.5,0,,,,,,,,,,,0,0,27087.5,0,99.84,0,Không,NO,0,0,,0,0,,0,0,,,13/10/2026 12:51:27,Võ Hoàng Phúc,06/10/2026 15:54:45,Võ Hoàng Phúc
+PR1002668075,PO1002668075,Phiếu tạm,FZA50101,FZA50101 _ Sóng Thần _ Lưu Hàng,10/10/2026 12:00:00,15/10/2026 12:00:00,,,V001405,CÔNG TY CỔ PHẦN THƯƠNG MẠI HI-FOODS,0,0,0,0,,0,14,1001001024403,8936077113263,KINGxBON - PIZZA THẬP CẨM 210G,CÁI,,,,300,25,0.292,45901,0,,,,,,,,,,,0,0,45901,0,63,0,Không,NO,0,0,,0,0,,0,0,,,13/10/2026 12:51:27,Võ Hoàng Phúc,06/10/2026 15:54:45,Võ Hoàng Phúc
+PR1002668075,PO1002668075,Phiếu tạm,FZA50101,FZA50101 _ Sóng Thần _ Lưu Hàng,10/10/2026 12:00:00,15/10/2026 12:00:00,,,V001405,CÔNG TY CỔ PHẦN THƯƠNG MẠI HI-FOODS,0,0,0,0,,0,14,1001001024402,8936077113256,KINGxBON - PIZZA TÔM MAYONNAISE 200G,CÁI,,,,204,17,0.198,42946,0,,,,,,,,,,,0,0,42946,0,40.8,0,Không,NO,0,0,,0,0,,0,0,,,13/10/2026 12:51:27,Võ Hoàng Phúc,06/10/2026 15:54:45,Võ Hoàng Phúc`;
+
+      let inboundOrders = [];
+      let filteredInbound = [];
+      let dateFilterMode = 'ALL';
+      let customDateVal = '';
+      let activeSubView = 'inbound'; // 'inbound' | 'balance'
+
+      function cleanNum(val) {
+        if (!val) return 0;
+        const cleaned = String(val).replace(/[^0-9.-]/g, '');
+        const n = parseFloat(cleaned);
+        return isNaN(n) ? 0 : n;
+      }
+
+      function extractDateOnly(dateStr) {
+        if (!dateStr) return '';
+        // Handles "15/10/2026 12:00:00" or "15/10/2026" or "2026-10-15"
+        const clean = dateStr.trim();
+        const spaceIdx = clean.indexOf(' ');
+        const datePart = spaceIdx > 0 ? clean.substring(0, spaceIdx) : clean;
+        if (datePart.includes('/')) {
+          const p = datePart.split('/');
+          if (p.length === 3) {
+            const d = String(p[0]).padStart(2, '0');
+            const m = String(p[1]).padStart(2, '0');
+            let y = p[2];
+            if (y.length === 2) y = '20' + y;
+            return `${d}/${m}/${y}`;
+          }
+        } else if (datePart.includes('-')) {
+          const p = datePart.split('-');
+          if (p.length === 3) {
+            return `${String(p[2]).padStart(2, '0')}/${String(p[1]).padStart(2, '0')}/${p[0]}`;
+          }
+        }
+        return datePart;
+      }
+
+      function parseInboundRowObject(row) {
+        const pr = (row['Mã PR'] || row['PR'] || row['Phiếu nhập'] || '').trim();
+        const po = (row['Mã PO'] || row['PO'] || '').trim();
+        if (!pr && !po) return null;
+
+        const rawStatus = (row['Trạng thái'] || row['Status'] || 'Phiếu tạm').trim();
+        const ncc = (row['Tên nhà cung cấp'] || row['Nhà cung cấp'] || row['NCC'] || 'NCC Khác').trim();
+        const skuName = (row['Tên hàng'] || row['Tên sản phẩm'] || row['Mặt hàng'] || '').trim();
+        const barcode = (row['Mã hàng'] || row['Mã nội bộ'] || row['Barcode'] || '').trim();
+        const uom = (row['ĐVT'] || row['Đơn vị'] || 'CÁI').trim();
+
+        const rawDate = row['Ngày nhận hàng'] || row['Ngày giao hàng dự kiến'] || row['Ngày giao hàng NCC xác nhận'] || row['Ngày cập nhật'] || row['Thời gian tạo'] || '';
+        const normDate = extractDateOnly(rawDate);
+
+        const poQty = cleanNum(row['Số lượng PO'] || row['SL PO'] || row['SL Đặt']);
+        let prQty = cleanNum(row['Số lượng PR (thực nhận)'] || row['SL Thực nhận'] || row['SL PR']);
+        
+        // If status is received or completed and prQty is 0, check other receive columns
+        if (prQty === 0 && (rawStatus.toLowerCase().includes('đã') || rawStatus.toLowerCase().includes('hoàn'))) {
+          prQty = poQty;
+        }
+
+        const expKg = cleanNum(row['Khối lượng dự kiến nhận (KG)'] || row['KG dự kiến']);
+        const recKg = cleanNum(row['Khối lượng thực nhận (KG)'] || row['KG thực nhận'] || row['KG']);
+        const finalKg = recKg > 0 ? recKg : (prQty > 0 && expKg > 0 && poQty > 0 ? (expKg * prQty / poQty) : expKg);
+
+        const claimQty = cleanNum(row['SL claim NCC'] || row['Claim']);
+        const claimRate = cleanNum(row['Tỷ lệ claim (%)']);
+        const lossQty = cleanNum(row['SL hao hụt'] || row['Hao hụt']);
+
+        return {
+          key: `${pr}_${barcode}_${skuName}`,
+          pr,
+          po,
+          status: rawStatus,
+          ncc,
+          skuName,
+          barcode,
+          uom,
+          date: normDate || '14/10/2026',
+          rawDate,
+          poQty,
+          prQty,
+          kg: Math.round(finalKg * 100) / 100,
+          cbm: cleanNum(row['Số CBM nhận'] || row['Số CBM đặt']),
+          carton: cleanNum(row['Số thùng nhận'] || row['Số thùng đặt']),
+          claimQty,
+          claimRate,
+          lossQty,
+          updatedAt: row['Ngày cập nhật'] || new Date().toLocaleString('vi-VN')
+        };
+      }
+
+      function parseCsvLines(csvText) {
+        const lines = csvText.trim().split(/\r?\n/);
+        if (lines.length < 2) return [];
+        
+        // Determine delimiter: tab or comma
+        const firstLine = lines[0];
+        const isTab = firstLine.includes('\t') && (firstLine.split('\t').length > firstLine.split(',').length);
+        const delimiter = isTab ? '\t' : ',';
+
+        const parseLine = (text) => {
+          if (isTab) return text.split('\t').map(s => s.trim().replace(/^"|"$/g, ''));
+          // Standard CSV parser with quoted field handling
+          const result = [];
+          let cur = '';
+          let inQuotes = false;
+          for (let i = 0; i < text.length; i++) {
+            const ch = text[i];
+            if (ch === '"') {
+              if (inQuotes && text[i+1] === '"') { cur += '"'; i++; }
+              else inQuotes = !inQuotes;
+            } else if (ch === ',' && !inQuotes) {
+              result.push(cur.trim());
+              cur = '';
+            } else {
+              cur += ch;
+            }
+          }
+          result.push(cur.trim());
+          return result;
+        };
+
+        const headers = parseLine(lines[0]);
+        const items = [];
+        for (let i = 1; i < lines.length; i++) {
+          const l = lines[i].trim();
+          if (!l) continue;
+          const cols = parseLine(l);
+          const rowObj = {};
+          headers.forEach((h, idx) => {
+            rowObj[h] = cols[idx] !== undefined ? cols[idx] : '';
+          });
+          const parsed = parseInboundRowObject(rowObj);
+          if (parsed) items.push(parsed);
+        }
+        return items;
+      }
+
+      function loadStoredData() {
+        try {
+          const savedUrl = localStorage.getItem(STORAGE_KEY_GSHEET);
+          if (savedUrl) {
+            const input = document.getElementById('inboundGSheetUrlInput');
+            if (input) input.value = savedUrl;
+          }
+
+          const raw = localStorage.getItem(STORAGE_KEY_INBOUND);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              inboundOrders = parsed;
+              return;
+            }
+          }
+        } catch (e) {
+          console.warn('Could not read stored inbound data:', e);
+        }
+
+        // Initialize with default sample data if no stored data
+        inboundOrders = parseCsvLines(SAMPLE_INBOUND_CSV);
+        saveStoredData();
+      }
+
+      function saveStoredData() {
+        try {
+          localStorage.setItem(STORAGE_KEY_INBOUND, JSON.stringify(inboundOrders));
+        } catch (e) {
+          console.warn('Storage quota exceeded:', e);
+        }
+      }
+
+      function upsertInboundRows(newRows) {
+        if (!newRows || newRows.length === 0) return 0;
+        const map = new Map();
+        inboundOrders.forEach(item => {
+          map.set(item.key, item);
+        });
+
+        let addedCount = 0;
+        let updatedCount = 0;
+
+        newRows.forEach(item => {
+          if (map.has(item.key)) {
+            const existing = map.get(item.key);
+            // Update fields with latest state
+            existing.status = item.status;
+            existing.prQty = item.prQty;
+            existing.kg = item.kg;
+            existing.claimQty = item.claimQty;
+            existing.lossQty = item.lossQty;
+            existing.updatedAt = item.updatedAt || new Date().toLocaleString('vi-VN');
+            updatedCount++;
+          } else {
+            map.set(item.key, item);
+            addedCount++;
+          }
+        });
+
+        inboundOrders = Array.from(map.values());
+        saveStoredData();
+        return { addedCount, updatedCount, total: inboundOrders.length };
+      }
+
+      function populateSuppliersDropdown() {
+        const select = document.getElementById('inboundSupplierSelect');
+        if (!select) return;
+        const currentVal = select.value;
+        const suppliers = Array.from(new Set(inboundOrders.map(o => o.ncc))).filter(Boolean).sort();
+        
+        let html = '<option value="ALL">Tất cả Nhà Cung Cấp</option>';
+        suppliers.forEach(s => {
+          html += `<option value="${s}">${s}</option>`;
+        });
+        select.innerHTML = html;
+        if (suppliers.includes(currentVal)) select.value = currentVal;
+      }
+
+      function applyFilters() {
+        const supplierVal = document.getElementById('inboundSupplierSelect') ? document.getElementById('inboundSupplierSelect').value : 'ALL';
+        const statusVal = document.getElementById('inboundStatusSelect') ? document.getElementById('inboundStatusSelect').value : 'ALL';
+        const searchVal = (document.getElementById('inboundSearchInput') ? document.getElementById('inboundSearchInput').value : '').toLowerCase().trim();
+
+        filteredInbound = inboundOrders.filter(item => {
+          // Date Filter
+          if (dateFilterMode === 'TODAY') {
+            const todayStr = new Date().toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            if (item.date !== todayStr) return false;
+          } else if (dateFilterMode === '7DAYS') {
+            // Last 7 days
+            const itemDate = parseDate(item.date);
+            const now = new Date();
+            const diffDays = (now - itemDate) / (1000 * 60 * 60 * 24);
+            if (diffDays < 0 || diffDays > 7) return false;
+          } else if (dateFilterMode === 'CUSTOM' && customDateVal) {
+            const expStr = extractDateOnly(customDateVal);
+            if (item.date !== expStr) return false;
+          }
+
+          // Supplier Filter
+          if (supplierVal !== 'ALL' && item.ncc !== supplierVal) return false;
+
+          // Status Filter
+          if (statusVal === 'TEMPORARY') {
+            if (!item.status.toLowerCase().includes('tạm') && !item.status.toLowerCase().includes('chờ')) return false;
+          } else if (statusVal === 'RECEIVED') {
+            if (!item.status.toLowerCase().includes('đã') && !item.status.toLowerCase().includes('hoàn') && !item.status.toLowerCase().includes('nhập')) return false;
+          }
+
+          // Search Filter
+          if (searchVal) {
+            const hay = `${item.pr} ${item.po} ${item.ncc} ${item.skuName} ${item.barcode}`.toLowerCase();
+            if (!hay.includes(searchVal)) return false;
+          }
+
+          return true;
+        });
+
+        renderKPIs();
+        renderChart();
+        renderTables();
+      }
+
+      function renderKPIs() {
+        // 1. INBOUND METRICS
+        const prSet = new Set(filteredInbound.map(o => o.pr));
+        const totalPO = filteredInbound.reduce((acc, o) => acc + o.poQty, 0);
+        const totalPR = filteredInbound.reduce((acc, o) => acc + o.prQty, 0);
+        const totalKg = filteredInbound.reduce((acc, o) => acc + o.kg, 0);
+        const totalCbm = filteredInbound.reduce((acc, o) => acc + o.cbm, 0);
+        
+        let pendingCount = 0;
+        let completedCount = 0;
+        prSet.forEach(prCode => {
+          const prItems = filteredInbound.filter(o => o.pr === prCode);
+          const isPending = prItems.some(o => o.status.toLowerCase().includes('tạm') || o.status.toLowerCase().includes('chờ'));
+          if (isPending) pendingCount++;
+          else completedCount++;
+        });
+
+        const inFulfillment = totalPO > 0 ? Math.round((totalPR / totalPO) * 100) : 0;
+
+        document.getElementById('kpiInboundPrCount').innerText = `${prSet.size} PR (${filteredInbound.length} dòng)`;
+        document.getElementById('kpiInboundTotalReceived').innerText = totalPR.toLocaleString('vi-VN');
+        document.getElementById('kpiInboundTotalPO').innerText = totalPO.toLocaleString('vi-VN');
+        document.getElementById('kpiInboundFulfillmentRate').innerText = `${inFulfillment}%`;
+        document.getElementById('kpiInboundWeight').innerText = `${Math.round(totalKg).toLocaleString('vi-VN')} KG | ${totalCbm.toFixed(2)} CBM`;
+        document.getElementById('kpiInboundPendingCount').innerText = `${pendingCount} PR`;
+        document.getElementById('kpiInboundCompletedCount').innerText = `${completedCount} PR`;
+
+        // 2. OUTBOUND METRICS (Auto mapped from rawOrders matching active dates)
+        const relevantDates = new Set(filteredInbound.map(o => o.date));
+        let matchedWaves = rawOrders;
+        if (dateFilterMode !== 'ALL' && relevantDates.size > 0) {
+          matchedWaves = rawOrders.filter(w => relevantDates.has(w.date));
+        }
+
+        const outDemand = matchedWaves.reduce((acc, w) => acc + w.total, 0);
+        const outAllocated = matchedWaves.reduce((acc, w) => acc + w.allocated, 0);
+        const outPicked = matchedWaves.reduce((acc, w) => acc + w.picked, 0);
+        const outDropped = matchedWaves.reduce((acc, w) => acc + Math.abs(w.dropped), 0);
+        const outRate = outDemand > 0 ? ((outPicked / outDemand) * 100).toFixed(1) : '0';
+
+        document.getElementById('kpiOutboundWaveCount').innerText = `${matchedWaves.length} Wave`;
+        document.getElementById('kpiOutboundTotalPicked').innerText = outPicked.toLocaleString('vi-VN');
+        document.getElementById('kpiOutboundTotalDemand').innerText = outDemand.toLocaleString('vi-VN');
+        document.getElementById('kpiOutboundRate').innerText = `${outRate}%`;
+        document.getElementById('kpiOutboundDropped').innerText = outDropped.toLocaleString('vi-VN');
+        document.getElementById('kpiOutboundAllocated').innerText = outAllocated.toLocaleString('vi-VN');
+
+        // 3. NET FLOW BALANCE (Inbound Received vs Outbound Picked)
+        const netFlowUnits = totalPR - outPicked;
+        const netEl = document.getElementById('kpiNetUnits');
+        const badgeEl = document.getElementById('kpiNetFlowBadge');
+        const descEl = document.getElementById('kpiNetDescription');
+        const cardNet = document.getElementById('cardNetFlow');
+
+        if (netFlowUnits > 0) {
+          netEl.innerText = `+${netFlowUnits.toLocaleString('vi-VN')}`;
+          netEl.className = 'text-2xl font-black text-indigo-400';
+          badgeEl.className = 'px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-bold border border-indigo-500/30';
+          badgeEl.innerText = `Nạp ròng (+${Math.round(netFlowUnits / 1000)}k)`;
+          descEl.innerHTML = `<b class="text-indigo-300">Tồn kho tăng:</b> Nhập > Xuất`;
+        } else if (netFlowUnits < 0) {
+          netEl.innerText = `${netFlowUnits.toLocaleString('vi-VN')}`;
+          netEl.className = 'text-2xl font-black text-rose-400';
+          badgeEl.className = 'px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 font-bold border border-rose-500/30';
+          badgeEl.innerText = `Xả ròng (${Math.round(netFlowUnits / 1000)}k)`;
+          descEl.innerHTML = `<b class="text-rose-300">Tồn kho giảm:</b> Xuất > Nhập`;
+        } else {
+          netEl.innerText = `0`;
+          netEl.className = 'text-2xl font-black text-emerald-300';
+          badgeEl.className = 'px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30';
+          badgeEl.innerText = `Cân bằng`;
+          descEl.innerText = `Lưu lượng Nhập = Xuất`;
+        }
+
+        // 4. CLAIM & QUALITY
+        const totalClaim = filteredInbound.reduce((acc, o) => acc + o.claimQty, 0);
+        const totalLoss = filteredInbound.reduce((acc, o) => acc + o.lossQty, 0);
+        const avgClaimPct = totalPO > 0 ? ((totalClaim / totalPO) * 100).toFixed(1) : 0;
+
+        document.getElementById('kpiTotalClaimQty').innerText = totalClaim.toLocaleString('vi-VN');
+        document.getElementById('kpiAvgClaimRate').innerText = `${avgClaimPct}%`;
+        document.getElementById('kpiTotalLossQty').innerText = totalLoss.toLocaleString('vi-VN');
+
+        const claimItems = filteredInbound.filter(o => o.claimQty > 0);
+        document.getElementById('kpiClaimCountBadge').innerText = `${claimItems.length} dòng claim`;
+
+        if (claimItems.length > 0) {
+          const supplierClaimMap = {};
+          claimItems.forEach(o => {
+            supplierClaimMap[o.ncc] = (supplierClaimMap[o.ncc] || 0) + o.claimQty;
+          });
+          const topNcc = Object.entries(supplierClaimMap).sort((a,b) => b[1] - a[1])[0];
+          document.getElementById('kpiTopClaimSupplier').innerText = `${topNcc[0]} (${topNcc[1]} sp)`;
+        } else {
+          document.getElementById('kpiTopClaimSupplier').innerText = `100% đạt chuẩn nhận`;
+        }
+
+        // Stored Badge Count
+        const storedPrSet = new Set(inboundOrders.map(o => o.pr));
+        document.getElementById('inboundStoredBadge').innerText = `${storedPrSet.size} PR (${inboundOrders.length} dòng)`;
+      }
+
+      function renderChart() {
+        const container = document.getElementById('inoutChartContainer');
+        if (!container) return;
+
+        // Group by Date for comparison
+        const dateMap = new Map();
+
+        // Inbound
+        inboundOrders.forEach(o => {
+          if (!dateMap.has(o.date)) {
+            dateMap.set(o.date, { date: o.date, inPR: 0, outPick: 0 });
+          }
+          dateMap.get(o.date).inPR += o.prQty;
+        });
+
+        // Outbound
+        rawOrders.forEach(w => {
+          if (!dateMap.has(w.date)) {
+            dateMap.set(w.date, { date: w.date, inPR: 0, outPick: 0 });
+          }
+          dateMap.get(w.date).outPick += w.picked;
+        });
+
+        // Sort dates chronologically
+        const sortedEntries = Array.from(dateMap.values())
+          .filter(e => e.inPR > 0 || e.outPick > 0)
+          .sort((a, b) => parseDate(a.date).getTime() - parseDate(b.date).getTime())
+          .slice(-14); // Show last 14 days with activity
+
+        if (sortedEntries.length === 0) {
+          container.innerHTML = '<div class="text-slate-400 text-xs">Chưa có đủ dữ liệu giao dịch để vẽ biểu đồ so sánh.</div>';
+          return;
+        }
+
+        const maxVal = Math.max(...sortedEntries.map(e => Math.max(e.inPR, e.outPick)), 100);
+        const w = container.clientWidth || 800;
+        const h = 230;
+        const padding = { top: 25, bottom: 35, left: 50, right: 20 };
+        const chartW = w - padding.left - padding.right;
+        const chartH = h - padding.top - padding.bottom;
+
+        const slotW = chartW / sortedEntries.length;
+        const barW = Math.max(Math.min(slotW * 0.35, 24), 8);
+
+        let barsSvg = '';
+        sortedEntries.forEach((entry, idx) => {
+          const xCenter = padding.left + idx * slotW + slotW / 2;
+          
+          // Inbound Bar (Indigo)
+          const inH = (entry.inPR / maxVal) * chartH;
+          const inX = xCenter - barW - 2;
+          const inY = padding.top + chartH - inH;
+
+          // Outbound Bar (Cyan)
+          const outH = (entry.outPick / maxVal) * chartH;
+          const outX = xCenter + 2;
+          const outY = padding.top + chartH - outH;
+
+          // Net dot
+          const net = entry.inPR - entry.outPick;
+          const netDotY = padding.top + chartH - (Math.abs(net) / maxVal) * chartH;
+
+          barsSvg += `
+            <g class="cursor-pointer group">
+              <!-- Inbound Bar -->
+              <rect x="${inX}" y="${inY}" width="${barW}" height="${Math.max(inH, 2)}" rx="3" fill="#6366f1" class="hover:opacity-80 transition">
+                <title>${entry.date} - Nhập Thực Nhận: ${entry.inPR.toLocaleString()} sp</title>
+              </rect>
+              
+              <!-- Outbound Bar -->
+              <rect x="${outX}" y="${outY}" width="${barW}" height="${Math.max(outH, 2)}" rx="3" fill="#06b6d4" class="hover:opacity-80 transition">
+                <title>${entry.date} - Xuất Thực Pick: ${entry.outPick.toLocaleString()} sp</title>
+              </rect>
+
+              <!-- Date Label -->
+              <text x="${xCenter}" y="${h - 10}" text-anchor="middle" font-size="10" fill="#94a3b8" font-weight="600">
+                ${entry.date.slice(0, 5)}
+              </text>
+            </g>
+          `;
+        });
+
+        // Grid lines
+        let gridSvg = '';
+        const steps = 4;
+        for (let i = 0; i <= steps; i++) {
+          const y = padding.top + (chartH / steps) * i;
+          const val = Math.round(maxVal - (maxVal / steps) * i);
+          gridSvg += `
+            <line x1="${padding.left}" y1="${y}" x2="${w - padding.right}" y2="${y}" stroke="#334155" stroke-dasharray="3,3" stroke-width="0.7" />
+            <text x="${padding.left - 8}" y="${y + 3}" text-anchor="end" font-size="9" fill="#64748b" font-family="monospace">${val >= 1000 ? (val/1000).toFixed(0) + 'k' : val}</text>
+          `;
+        }
+
+        container.innerHTML = `
+          <svg viewBox="0 0 ${w} ${h}" class="w-full h-full select-none">
+            ${gridSvg}
+            ${barsSvg}
+          </svg>
+        `;
+      }
+
+      function renderTables() {
+        const tbodyIn = document.getElementById('inboundTableBody');
+        const countEl = document.getElementById('inoutTableSummaryCount');
+
+        if (tbodyIn) {
+          tbodyIn.innerHTML = '';
+          if (filteredInbound.length === 0) {
+            tbodyIn.innerHTML = `
+              <tr>
+                <td colspan="13" class="py-10 text-center text-slate-400">
+                  Không tìm thấy dữ liệu phiếu nhập phù hợp với bộ lọc hiện tại.
+                </td>
+              </tr>
+            `;
+          } else {
+            filteredInbound.forEach((o, idx) => {
+              const tr = document.createElement('tr');
+              tr.className = 'hover:bg-slate-800/80 transition';
+
+              let statusBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] bg-amber-950 text-amber-300 border border-amber-600/50 font-bold">Phiếu tạm</span>';
+              if (o.status.toLowerCase().includes('đã') || o.status.toLowerCase().includes('nhập') || o.status.toLowerCase().includes('hoàn')) {
+                statusBadge = '<span class="px-2 py-0.5 rounded-full text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-600/50 font-bold">Đã nhập kho</span>';
+              }
+
+              const fulfillPct = o.poQty > 0 ? Math.round((o.prQty / o.poQty) * 100) : 0;
+              let fulfillBadge = `<span class="font-mono text-slate-400">${fulfillPct}%</span>`;
+              if (fulfillPct >= 99) fulfillBadge = `<span class="font-mono text-emerald-400 font-bold">${fulfillPct}%</span>`;
+              else if (fulfillPct > 0) fulfillBadge = `<span class="font-mono text-amber-400 font-bold">${fulfillPct}%</span>`;
+
+              let claimBadge = '<span class="text-slate-500">—</span>';
+              if (o.claimQty > 0) {
+                claimBadge = `<span class="px-2 py-0.5 rounded bg-rose-950/80 text-rose-300 border border-rose-700/60 font-bold text-[10px]">Claim: ${o.claimQty}</span>`;
+              }
+
+              tr.innerHTML = `
+                <td class="py-2.5 px-3 font-mono text-slate-400">${idx + 1}</td>
+                <td class="py-2.5 px-3 font-mono font-bold text-indigo-300 select-all">${o.pr}</td>
+                <td class="py-2.5 px-3 font-mono text-slate-300 select-all">${o.po}</td>
+                <td class="py-2.5 px-3">${statusBadge}</td>
+                <td class="py-2.5 px-3 text-slate-300 font-medium">${o.date}</td>
+                <td class="py-2.5 px-3 max-w-[180px] truncate text-slate-200" title="${o.ncc}">${o.ncc}</td>
+                <td class="py-2.5 px-3 max-w-[220px] truncate text-white font-medium" title="${o.skuName}">${o.skuName}</td>
+                <td class="py-2.5 px-3 font-mono text-slate-400">${o.uom}</td>
+                <td class="py-2.5 px-3 text-right font-mono text-slate-300">${o.poQty.toLocaleString()}</td>
+                <td class="py-2.5 px-3 text-right font-mono font-bold text-indigo-300">${o.prQty.toLocaleString()}</td>
+                <td class="py-2.5 px-3 text-right font-mono text-emerald-400 font-semibold">${o.kg > 0 ? o.kg.toLocaleString() + ' kg' : '—'}</td>
+                <td class="py-2.5 px-3 text-right">${fulfillBadge}</td>
+                <td class="py-2.5 px-3 text-center">${claimBadge}</td>
+              `;
+              tbodyIn.appendChild(tr);
+            });
+          }
+        }
+
+        // Render Balance Table
+        renderBalanceTable();
+
+        if (countEl) {
+          countEl.innerText = activeSubView === 'inbound' 
+            ? `Hiển thị ${filteredInbound.length} dòng phiếu nhập` 
+            : `Hiển thị bảng cân đối theo ngày`;
+        }
+      }
+
+      function renderBalanceTable() {
+        const tbodyBal = document.getElementById('balanceTableBody');
+        if (!tbodyBal) return;
+        tbodyBal.innerHTML = '';
+
+        const dateMap = new Map();
+
+        // Inbound grouping
+        inboundOrders.forEach(o => {
+          if (!dateMap.has(o.date)) {
+            dateMap.set(o.date, {
+              date: o.date,
+              prCount: new Set(),
+              inPO: 0,
+              inPR: 0,
+              inKg: 0,
+              waveCount: 0,
+              outDemand: 0,
+              outPicked: 0
+            });
+          }
+          const rec = dateMap.get(o.date);
+          rec.prCount.add(o.pr);
+          rec.inPO += o.poQty;
+          rec.inPR += o.prQty;
+          rec.inKg += o.kg;
+        });
+
+        // Outbound grouping
+        rawOrders.forEach(w => {
+          if (!dateMap.has(w.date)) {
+            dateMap.set(w.date, {
+              date: w.date,
+              prCount: new Set(),
+              inPO: 0,
+              inPR: 0,
+              inKg: 0,
+              waveCount: 0,
+              outDemand: 0,
+              outPicked: 0
+            });
+          }
+          const rec = dateMap.get(w.date);
+          rec.waveCount++;
+          rec.outDemand += w.total;
+          rec.outPicked += w.picked;
+        });
+
+        const sortedDates = Array.from(dateMap.values())
+          .sort((a, b) => parseDate(b.date).getTime() - parseDate(a.date).getTime());
+
+        if (sortedDates.length === 0) {
+          tbodyBal.innerHTML = `<tr><td colspan="10" class="py-10 text-center text-slate-400">Chưa có dữ liệu để đối chiếu.</td></tr>`;
+          return;
+        }
+
+        sortedDates.forEach(row => {
+          const net = row.inPR - row.outPicked;
+          let netDisplay = `<span class="text-slate-400 font-mono">0</span>`;
+          let statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] bg-slate-800 text-slate-400">Cân bằng</span>`;
+
+          if (net > 0) {
+            netDisplay = `<span class="text-indigo-400 font-mono font-black">+${net.toLocaleString()}</span>`;
+            statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] bg-indigo-950 text-indigo-300 border border-indigo-700/60 font-bold">📥 Tồn kho tăng (+${Math.round(net/1000)}k)</span>`;
+          } else if (net < 0) {
+            netDisplay = `<span class="text-rose-400 font-mono font-black">${net.toLocaleString()}</span>`;
+            statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] bg-rose-950 text-rose-300 border border-rose-700/60 font-bold">📤 Tồn kho giảm (${Math.round(net/1000)}k)</span>`;
+          }
+
+          const tr = document.createElement('tr');
+          tr.className = 'hover:bg-slate-800/80 transition';
+          tr.innerHTML = `
+            <td class="py-2.5 px-3 font-semibold text-white">${row.date}</td>
+            <td class="py-2.5 px-3 text-center font-mono text-indigo-300">${row.prCount.size} PR</td>
+            <td class="py-2.5 px-3 text-right font-mono text-slate-300">${row.inPO.toLocaleString()}</td>
+            <td class="py-2.5 px-3 text-right font-mono font-bold text-indigo-300">${row.inPR.toLocaleString()}</td>
+            <td class="py-2.5 px-3 text-right font-mono text-emerald-400">${Math.round(row.inKg).toLocaleString()} kg</td>
+            <td class="py-2.5 px-3 text-center font-mono text-cyan-300">${row.waveCount} Wave</td>
+            <td class="py-2.5 px-3 text-right font-mono text-slate-300">${row.outDemand.toLocaleString()}</td>
+            <td class="py-2.5 px-3 text-right font-mono font-bold text-cyan-400">${row.outPicked.toLocaleString()}</td>
+            <td class="py-2.5 px-3 text-right">${netDisplay}</td>
+            <td class="py-2.5 px-3 text-center">${statusBadge}</td>
+          `;
+          tbodyBal.appendChild(tr);
+        });
+      }
+
+      function switchSubView(view) {
+        activeSubView = view;
+        const btnIn = document.getElementById('btnSubViewInbound');
+        const btnBal = document.getElementById('btnSubViewBalance');
+        const wrapIn = document.getElementById('subViewInboundTableWrapper');
+        const wrapBal = document.getElementById('subViewBalanceTableWrapper');
+
+        const activeClass = 'px-3.5 py-1.5 rounded-lg bg-indigo-600 text-white shadow-sm flex items-center gap-1.5 transition cursor-pointer';
+        const inactiveClass = 'px-3.5 py-1.5 rounded-lg text-slate-400 hover:text-white flex items-center gap-1.5 transition cursor-pointer';
+
+        if (view === 'inbound') {
+          if (btnIn) btnIn.className = activeClass;
+          if (btnBal) btnBal.className = inactiveClass;
+          if (wrapIn) wrapIn.classList.remove('hidden');
+          if (wrapBal) wrapBal.classList.add('hidden');
+        } else {
+          if (btnIn) btnIn.className = inactiveClass;
+          if (btnBal) btnBal.className = activeClass;
+          if (wrapIn) wrapIn.classList.add('hidden');
+          if (wrapBal) wrapBal.classList.remove('hidden');
+        }
+
+        const countEl = document.getElementById('inoutTableSummaryCount');
+        if (countEl) {
+          countEl.innerText = activeSubView === 'inbound' 
+            ? `Hiển thị ${filteredInbound.length} dòng phiếu nhập` 
+            : `Hiển thị bảng cân đối theo ngày`;
+        }
+      }
+
+      // Google Sheet sync logic
+      function convertToCsvExportUrl(url) {
+        if (!url) return '';
+        // If already a csv pub url
+        if (url.includes('/pub?') && url.includes('output=csv')) return url;
+        // Standard edit link: /spreadsheets/d/(ID)/...
+        const match = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+        if (match && match[1]) {
+          const docId = match[1];
+          let gid = '0';
+          const gidMatch = url.match(/[?&#]gid=([0-9]+)/);
+          if (gidMatch && gidMatch[1]) gid = gidMatch[1];
+          return `https://docs.google.com/spreadsheets/d/${docId}/export?format=csv&gid=${gid}`;
+        }
+        return url;
+      }
+
+      async function syncGoogleSheet() {
+        const input = document.getElementById('inboundGSheetUrlInput');
+        const url = (input ? input.value : '').trim();
+        if (!url) {
+          alert('Vui lòng dán đường link Google Sheet chứa phiếu nhập kho!');
+          return;
+        }
+
+        localStorage.setItem(STORAGE_KEY_GSHEET, url);
+        const spinner = document.getElementById('syncInboundSpinner');
+        const btn = document.getElementById('btnSyncInboundSheet');
+        const badge = document.getElementById('inboundGSheetStatusBadge');
+        const lastSyncText = document.getElementById('inboundLastSyncText');
+
+        if (spinner) spinner.classList.remove('hidden');
+        if (btn) btn.disabled = true;
+
+        try {
+          const csvUrl = convertToCsvExportUrl(url);
+          const resp = await fetch(csvUrl);
+          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+          const text = await resp.text();
+          if (!text || text.trim().length === 0) throw new Error('Không có nội dung trả về');
+
+          const newRows = parseCsvLines(text);
+          if (newRows.length === 0) throw new Error('Không tìm thấy dòng dữ liệu PR/PO hợp lệ nào');
+
+          const stats = upsertInboundRows(newRows);
+          populateSuppliersDropdown();
+          applyFilters();
+
+          if (badge) {
+            badge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30';
+            badge.innerText = `Đã đồng bộ live (${newRows.length} dòng)`;
+          }
+          if (lastSyncText) {
+            lastSyncText.innerText = `Lần đồng bộ gần nhất: ${new Date().toLocaleTimeString('vi-VN')} hôm nay`;
+          }
+          alert(`✅ Đã đồng bộ thành công ${newRows.length} dòng phiếu nhập từ Google Sheet!\n- Mới thêm: ${stats.addedCount}\n- Cập nhật: ${stats.updatedCount}`);
+        } catch (err) {
+          console.warn('Sync failed:', err);
+          if (badge) {
+            badge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30';
+            badge.innerText = 'Cần dán nhanh hoặc xuất CSV';
+          }
+          // Open paste modal as seamless fallback
+          openInboundPasteModal();
+          alert('⚠️ Trình duyệt chặn kết nối trực tiếp tới Google Sheets do chính sách bảo mật CORS.\n\n👉 Đã mở sẵn ô "Dán Dữ Liệu Nhanh": Bạn chỉ cần bấm Ctrl+A rồi Ctrl+C trên Google Sheet, sau đó bấm Ctrl+V vào ô này để nạp trong 1 giây nhé!');
+        } finally {
+          if (spinner) spinner.classList.add('hidden');
+          if (btn) btn.disabled = false;
+        }
+      }
+
+      function handleFiles(files) {
+        if (!files || files.length === 0) return;
+        const arr = Array.from(files);
+        let processedCount = 0;
+        let totalItems = 0;
+
+        arr.forEach(file => {
+          const isExcel = /\.(xlsx|xls)$/i.test(file.name);
+          const isCsv = /\.csv$/i.test(file.name);
+
+          if (isExcel) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              try {
+                const data = new Uint8Array(e.target.result);
+                const wb = XLSX.read(data, { type: 'array' });
+                const firstSheetName = wb.SheetNames[0];
+                const ws = wb.Sheets[firstSheetName];
+                const jsonRows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+                
+                const parsedRows = [];
+                jsonRows.forEach(r => {
+                  const p = parseInboundRowObject(r);
+                  if (p) parsedRows.push(p);
+                });
+
+                if (parsedRows.length > 0) {
+                  const stats = upsertInboundRows(parsedRows);
+                  totalItems += parsedRows.length;
+                }
+              } catch (err) {
+                console.error('Lỗi đọc file Excel:', err);
+              } finally {
+                processedCount++;
+                if (processedCount === arr.length) finalizeImport(totalItems);
+              }
+            };
+            reader.readAsArrayBuffer(file);
+          } else if (isCsv) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              try {
+                const text = e.target.result;
+                const parsedRows = parseCsvLines(text);
+                if (parsedRows.length > 0) {
+                  upsertInboundRows(parsedRows);
+                  totalItems += parsedRows.length;
+                }
+              } catch (err) {
+                console.error('Lỗi đọc file CSV:', err);
+              } finally {
+                processedCount++;
+                if (processedCount === arr.length) finalizeImport(totalItems);
+              }
+            };
+            reader.readAsText(file);
+          } else {
+            processedCount++;
+            if (processedCount === arr.length) finalizeImport(totalItems);
+          }
+        });
+      }
+
+      function finalizeImport(count) {
+        populateSuppliersDropdown();
+        applyFilters();
+        alert(`✅ Đã nạp thành công ${count} dòng phiếu nhập từ file! Dữ liệu đã được lưu an toàn.`);
+      }
+
+      function exportExcel() {
+        if (!window.XLSX) return;
+        const wb = XLSX.utils.book_new();
+
+        // 1. Sheet Cân Đối
+        const balAoa = [
+          ['BÁO CÁO CÂN ĐỐI DÒNG HÀNG NHẬP - XUẤT KHO ĐÔNG (KFM_FROZEN)'],
+          ['Thời gian xuất:', new Date().toLocaleString('vi-VN')],
+          [],
+          [
+            'Ngày Vận Hành', 'Số Phiếu Nhập', 'Tổng Đặt PO (Unit)', 'Tổng Thực Nhận PR (Unit)', 
+            'Khối Lượng Nhập (KG)', 'Số Wave Xuất', 'Tổng Yêu Cầu Xuất (Unit)', 
+            'Tổng Thực Pick Xuất (Unit)', 'Chênh Lệch Ròng Net Flow (Unit)', 'Đánh Giá'
+          ]
+        ];
+
+        const dateMap = new Map();
+        inboundOrders.forEach(o => {
+          if (!dateMap.has(o.date)) dateMap.set(o.date, { date: o.date, prs: new Set(), po: 0, pr: 0, kg: 0, waves: 0, outD: 0, outP: 0 });
+          const r = dateMap.get(o.date);
+          r.prs.add(o.pr);
+          r.po += o.poQty;
+          r.pr += o.prQty;
+          r.kg += o.kg;
+        });
+        rawOrders.forEach(w => {
+          if (!dateMap.has(w.date)) dateMap.set(w.date, { date: w.date, prs: new Set(), po: 0, pr: 0, kg: 0, waves: 0, outD: 0, outP: 0 });
+          const r = dateMap.get(w.date);
+          r.waves++;
+          r.outD += w.total;
+          r.outP += w.picked;
+        });
+
+        Array.from(dateMap.values())
+          .sort((a,b) => parseDate(b.date).getTime() - parseDate(a.date).getTime())
+          .forEach(r => {
+            const net = r.pr - r.outP;
+            const evalText = net > 0 ? 'Tồn kho tăng (+)' : (net < 0 ? 'Tồn kho giảm (-)' : 'Cân bằng');
+            balAoa.push([
+              r.date, r.prs.size, r.po, r.pr, Math.round(r.kg), r.waves, r.outD, r.outP, net, evalText
+            ]);
+          });
+
+        const wsBal = XLSX.utils.aoa_to_sheet(balAoa);
+        XLSX.utils.book_append_sheet(wb, wsBal, 'Can Doi Nhap - Xuat');
+
+        // 2. Sheet Chi Tiết Nhập
+        const inAoa = [
+          ['DANH SÁCH CHI TIẾT CÁC PHIẾU NHẬP KHO (INBOUND)'],
+          [],
+          [
+            'STT', 'Mã PR', 'Mã PO', 'Trạng Thái', 'Ngày Nhận', 'Nhà Cung Cấp', 
+            'Mã Hàng', 'Tên Hàng Hóa', 'ĐVT', 'SL Đặt PO', 'SL Thực Nhận PR', 
+            'Khối Lượng KG', 'SL Claim NCC', 'SL Hao Hụt', 'Ngày Cập Nhật'
+          ]
+        ];
+
+        inboundOrders.forEach((o, idx) => {
+          inAoa.push([
+            idx + 1, o.pr, o.po, o.status, o.date, o.ncc, o.barcode, o.skuName, 
+            o.uom, o.poQty, o.prQty, o.kg, o.claimQty, o.lossQty, o.updatedAt
+          ]);
+        });
+
+        const wsIn = XLSX.utils.aoa_to_sheet(inAoa);
+        XLSX.utils.book_append_sheet(wb, wsIn, 'Chi Tiet Nhap Kho');
+
+        // 3. Sheet Chi Tiết Xuất (Wave)
+        const outAoa = [
+          ['DANH SÁCH CHI TIẾT CÁC ĐỢT SÓNG XUẤT KHO (WAVE OUTBOUND)'],
+          [],
+          [
+            'STT', 'Tên Wave', 'Số PT', 'Loại Đơn', 'Ngày Đi Hàng', 'Trạng Thái', 
+            'Tổng Yêu Cầu', 'Allocate', 'Thực Pick', 'Rớt Đơn', 'Tỷ Lệ %'
+          ]
+        ];
+
+        rawOrders.forEach(w => {
+          outAoa.push([
+            w.stt, w.wave, w.pt, w.type, w.date, w.status, w.total, w.allocated, 
+            w.picked, Math.abs(w.dropped), w.rateFormatted
+          ]);
+        });
+
+        const wsOut = XLSX.utils.aoa_to_sheet(outAoa);
+        XLSX.utils.book_append_sheet(wb, wsOut, 'Chi Tiet Xuat Kho Wave');
+
+        const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+        const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `Bao_Cao_Tong_Hop_Nhap_Xuat_Kho_Dong_${new Date().toISOString().slice(0, 10)}.xlsx`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+
+      function backupData() {
+        const payload = {
+          app: 'KFM_FROZEN_INBOUND',
+          version: 1,
+          exportedAt: new Date().toISOString(),
+          count: inboundOrders.length,
+          data: inboundOrders
+        };
+        const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(payload, null, 2));
+        const link = document.createElement('a');
+        link.href = dataStr;
+        link.download = `Sao_Luu_Nhap_Kho_${new Date().toISOString().slice(0, 10)}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+
+      function restoreData(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            const payload = JSON.parse(e.target.result);
+            const items = payload.data || payload;
+            if (Array.isArray(items) && items.length > 0) {
+              inboundOrders = items;
+              saveStoredData();
+              populateSuppliersDropdown();
+              applyFilters();
+              alert(`✅ Đã khôi phục thành công ${items.length} dòng dữ liệu nhập kho!`);
+            } else {
+              alert('File không chứa dữ liệu nhập kho hợp lệ!');
+            }
+          } catch (err) {
+            alert('Lỗi đọc file JSON: ' + err.message);
+          }
+          event.target.value = '';
+        };
+        reader.readAsText(file);
+      }
+
+      function clearData() {
+        if (!confirm('Bạn có chắc muốn xoá sạch toàn bộ dữ liệu nhập kho đã lưu trên máy tính này?')) return;
+        inboundOrders = [];
+        saveStoredData();
+        populateSuppliersDropdown();
+        applyFilters();
+        alert('Đã xoá toàn bộ dữ liệu nhập kho!');
+      }
+
+      function setDateFilter(mode) {
+        dateFilterMode = mode;
+        const btnAll = document.getElementById('btnInFilterAll');
+        const btnToday = document.getElementById('btnInFilterToday');
+        const btn7 = document.getElementById('btnInFilter7Days');
+        const customInput = document.getElementById('inboundCustomDate');
+
+        const activeClass = 'px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-bold transition';
+        const inactiveClass = 'px-2.5 py-1 rounded-lg bg-slate-900 text-slate-300 hover:text-white border border-slate-700 font-medium transition';
+
+        if (btnAll) btnAll.className = mode === 'ALL' ? activeClass : inactiveClass;
+        if (btnToday) btnToday.className = mode === 'TODAY' ? activeClass : inactiveClass;
+        if (btn7) btn7.className = mode === '7DAYS' ? activeClass : inactiveClass;
+        if (customInput && mode !== 'CUSTOM') customInput.value = '';
+
+        applyFilters();
+      }
+
+      function setCustomDate(val) {
+        if (val) {
+          dateFilterMode = 'CUSTOM';
+          customDateVal = val;
+          const btnAll = document.getElementById('btnInFilterAll');
+          const btnToday = document.getElementById('btnInFilterToday');
+          const btn7 = document.getElementById('btnInFilter7Days');
+          const inactiveClass = 'px-2.5 py-1 rounded-lg bg-slate-900 text-slate-300 hover:text-white border border-slate-700 font-medium transition';
+          if (btnAll) btnAll.className = inactiveClass;
+          if (btnToday) btnToday.className = inactiveClass;
+          if (btn7) btn7.className = inactiveClass;
+        } else {
+          setDateFilter('ALL');
+        }
+        applyFilters();
+      }
+
+      return {
+        init() {
+          loadStoredData();
+          populateSuppliersDropdown();
+          applyFilters();
+        },
+        render: applyFilters,
+        syncGoogleSheet,
+        handleFiles,
+        exportExcel,
+        backupData,
+        restoreData,
+        clearData,
+        setDateFilter,
+        setCustomDate,
+        switchSubView,
+        parseCsvLines,
+        upsertInboundRows
+      };
+    })();
+
+    // Global bridge functions for HTML onclick attributes
+    function renderInOutTab() {
+      InOutModule.render();
+    }
+    function syncInboundGoogleSheet() {
+      InOutModule.syncGoogleSheet();
+    }
+    function handleInboundFiles(files) {
+      InOutModule.handleFiles(files);
+    }
+    function exportInOutExcelReport() {
+      InOutModule.exportExcel();
+    }
+    function backupInboundData() {
+      InOutModule.backupData();
+    }
+    function restoreInboundData(e) {
+      InOutModule.restoreData(e);
+    }
+    function clearInboundData() {
+      InOutModule.clearData();
+    }
+    function setInboundFilterDate(mode) {
+      InOutModule.setDateFilter(mode);
+    }
+    function setInboundFilterCustomDate(val) {
+      InOutModule.setCustomDate(val);
+    }
+    function applyInboundFilters() {
+      InOutModule.render();
+    }
+    function switchInOutSubView(view) {
+      InOutModule.switchSubView(view);
+    }
+    function openInboundPasteModal() {
+      const m = document.getElementById('inboundPasteModal');
+      if (m) m.classList.remove('hidden');
+    }
+    function closeInboundPasteModal() {
+      const m = document.getElementById('inboundPasteModal');
+      if (m) m.classList.add('hidden');
+    }
+    function processInboundPastedText() {
+      const ta = document.getElementById('inboundPasteTextarea');
+      const text = (ta ? ta.value : '').trim();
+      if (!text) {
+        alert('Vui lòng dán dữ liệu vào ô trước khi nạp!');
+        return;
+      }
+      const rows = InOutModule.parseCsvLines(text);
+      if (rows.length === 0) {
+        alert('Không nhận diện được dòng dữ liệu hợp lệ. Vui lòng kiểm tra lại cấu trúc các cột.');
+        return;
+      }
+      const stats = InOutModule.upsertInboundRows(rows);
+      InOutModule.render();
+      closeInboundPasteModal();
+      if (ta) ta.value = '';
+      alert(`✅ Đã nạp thành công ${rows.length} dòng phiếu nhập!\n- Mới thêm: ${stats.addedCount}\n- Cập nhật: ${stats.updatedCount}`);
+    }
+    function openGSheetGuideModal() {
+      const m = document.getElementById('gsheetGuideModal');
+      if (m) m.classList.remove('hidden');
+    }
+    function closeGSheetGuideModal() {
+      const m = document.getElementById('gsheetGuideModal');
+      if (m) m.classList.add('hidden');
+    }
+
     // ---------- GLOBAL INITIALIZATION ----------
     window.addEventListener('DOMContentLoaded', () => {
       autoSyncFromUrl();
+      if (typeof InOutModule !== 'undefined') InOutModule.init();
       fetchLiveSheet();
       autoRefreshTimer = setInterval(fetchLiveSheet, 60000);
       updateHeaderReconBadge();
