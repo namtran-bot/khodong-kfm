@@ -958,79 +958,152 @@ function doPost(e) {
     let currentSelectedWaveObj = null;
 
     const INITIAL_CSV_DATA = `
-STT,TÊN WAVE ,SỐ PT,LOẠI ĐƠN ,NGÀY ĐI HÀNG ,TRẠNG THÁI ,SHORT,TỔNG LƯỢNG ,LƯỢNG ALLOCATE ĐƯỢC ,LƯỢNG PICK ,SỐ LƯỢNG UNIT RỚT ĐƠN HÀNG ,SỐ LƯỢNG SKU /ĐƠN HÀNG,TỶ LỆ 
-1,KFM_FROZEN_NSO_270826,PT1714502,hàng đông NSO đợt 1 đi hàng 27.08,27/08/2026,HOÀN THÀNH ,6 SKU ,732,732,732,0,79,"100,0%"
-2,KFM_FROZEN_260826,PT1719215,Hàng ĐÔNG đi hàng ngày 26.08,26/06/2026,HOÀN THÀNH ,11 SKU ,14864,14530,12669,1861,123,"85,2%"
-3,KFM_FROZEN_NS0_D1_270826,PT1723591,hàng đông NSO đợt 2 và đông daily đi hàng 27.08,27/08/2026,HOÀN THÀNH ,20 SKU ,19316,18231,14351,3880,124,"74,3%"
-4, Wave - KFM_FROZEN_280626,PT1728736,hàng ĐÔNG đi hàng ngày 28.08,28/8/2026,HOÀN THÀNH ,27 SKU ,15150,13424,12208,1216,129,"80,6%"
-5,KFM_FROZEN_290826,PT1733543,hàng ĐÔNG đi hàng 29.08,29/08/2026,HOÀN THÀNH ,27 SKU ,15061,13867,12822,1045,124,"85,1%"
-6,KFM_FROZEN_CNSO_290826,PT1734211,Booking châm hàng ĐÔNG NSO A232 đi hàng ngày 29.08,29/08/2026,HOÀN THÀNH ,6 SKU ,317,275,233,42,32,"73,5%"
-7, KFM_FROZEN_BSNSO_290826,PT1734396,Booking bổ sung NSO A232 hàng ĐÔNG mã short tồn đi hàng 29.08,29/08/2026,HOÀN THÀNH ,0 SKU ,24,24,24,0,5,"100,0%"
-8,KFM_FROZEN_300826,PT1738035,Booking hàng ĐÔNG đi hàng ngày 30.08,30/08/2026,HOÀN THÀNH ,23 SKU ,12395,11427,10974,453,124,"88,5%"
-9,KFM_FROZEN_310826,PT1741603,hàng ĐÔNG đi hàng ngày 31.08,31/08/2026,HOÀN THÀNH ,24SKU ,8685,7597,6500,1097,118,"74,8%"
-10,KFM_FROZEN_BS_310826,PT1742468,bổ sung hàng Đông về hàng ngày 31.08,31/08/2026,HOÀN THÀNH ,26 SKU,1694,1328,1200,128,98,"70,8%"
-11,KFM_FROZEN_BS_A232_310826,PT1742671,bổ sung thêm 1 ST mà chia thiếu của Anh Thiện,31/08/2026,HOÀN THÀNH ,8 SKU,246,209,205,4,42,"83,3%"
-12,KFM_FROZEN_NSO_040926,PT1749839,hàng ĐÔNG NSO đợt 1 đi hàng ngày 04.09,04/09/2026,HOÀN THÀNH ,3sku,784,760,760,0,81,"96,9%"
-13,KFM_FROZEN_020926,PT1749853,DAILY 02.09.2026,02/09/2026,HOÀN THÀNH ,3 SKU,12988,12453,12453,0,125,"95,9%"
-14,KFM_FROZEN_030926,PT1754784,DAILY 03.09.2026,03/09/2026,HOÀN THÀNH ,0 SKU,14048,14048,14048,0,122,"100,0%"
-15,KFM_FROZEN_040926,PT1759106,DAILY + NSO BS 04.09.26,04/09/2026,HOÀN THÀNH ,0 SKU,11915,11915,11914,1,115,"100,0%"
-16,KFM_FROZEN_050926,PT1764778,booking hàng ĐÔNG đi hàng 05.09,05/09/2026,HOÀN THÀNH ,0 SKU ,13778,13778,13778,0,88,"100,0%"
-17,KFM_FROZEN_060926,PT1769197,booking hàng ĐÔNG đi hàng 06.09,06/09/2026,HOÀN THÀNH ,4 SKU,11252,11146,11146,0,115,"99,1%"
-18,KFM_FROZEN_CNSO_060926,PT1769763,châm NSO,06/09/2026,HOÀN THÀNH ,0 SKU ,146,146,146,0,14,"100,0%"
-19,KFM_FROZEN_070926,PT1773623,booking hàng ĐÔNG đi hàng 07.09,07/09/2026,HOÀN THÀNH ,7 SKU,10270,10216,10039,177,111,"97,8%"
-20,KFM_FROZEN_080926,PT1778209,booking hàng ĐÔNG đi hàng ngày 08.09,08/09/2026,HOÀN THÀNH ,0 SKU ,15372,15222,15202,20,25,"98,9%"
-21,KFM_FROZEN_BS_080926,PT1779129,booking hàng ĐÔNG (mã sắp ngưng) đi hàng ngày 08.09,08/09/2026,HOÀN THÀNH ,0 SKU ,5212,5212,5159,53,12,"99,0%"
-22,KFM_FROZEN_NSO_A250,PT1783212,hàng ĐÔNG NSO đợt 1 đi hàng ngày 11.09,11/09/2026,HOÀN THÀNH ,0 SKU ,739,739,731,8,71,"98,9%"
-23,KFM_FROZEN_090926,PT1783893,hàng ĐÔNG đi hàng ngày 09.09,09/09/2026,HOÀN THÀNH ,0 SKU ,10366,10366,10366,0,100,"100,0%"
-24,KFM_FROZEN_100926,PT1789442,hàng ĐÔNG đi hàng ngày 10.09,10/09/2026,HOÀN THÀNH ,0 SKU ,11876,11876,11876,0,112,"100,0%"
-25,KFM_FROZEN_DL_NSO_110926,PT1795286,hàng đông NSO đợt 2 và đông daily đi hàng 11.09,11/09/2026,HOÀN THÀNH ,0 SKU ,12747,12571,12571,0,99,"98,6%"
-26,KFM_FROZEN_120926,PT1801223,hàng ĐÔNG đi hàng ngày 12.09,12/09/2026,HOÀN THÀNH ,0 SKU ,13355,13355,13257,98,111,"99,3%"
-27,KFM_FROZEN_130926,PT1807225,hàng ĐÔNG đi hàng ngày 13.09,13/09/2026,HOÀN THÀNH ,2 SKU,12635,12635,12605,30,81,"99,8%"
-28,KFM_FROZEN_CA250,PT1808173,châm NSO,13/09/2026,HOÀN THÀNH ,0 SKU,106,106,106,0,11,"100,0%"
-29,KFM_FROZEN_140926,PT1811728,hàng ĐÔNG đi hàng ngày 14.09,14/09/2026,HOÀN THÀNH ,1 SKU,10852,10782,10782,0,81,"99,4%"
-30,KFM_FROZEN_160926,PT1823756,hàng ĐÔNG đi hàng ngày 16.09,16/09/2026,HOÀN THÀNH ,0 sku,10602,10602,10602,0,99,"100,0%"
-31,KFM_FROZEN_NSO_180926,PT1823803,ĐƠN NSO,18/09/2026,HOÀN THÀNH ,9 sku,2475,2285,2279,6,87,"92,1%"
-32,KFM_FROZEN_170926,PT1828684,Em gửi booking hàng đông giao ngày 17/09,17/09/2026,HOÀN THÀNH ,0 sku,11700,11700,11684,16,101,"99,9%"
-33,KFM_FROZEN_BS_170926,PT1829883,BS KEM,17/09/2026,HOÀN THÀNH ,0 SKU,16,16,16,0,1,"100,0%"
-34,KFM_FROZEN_BSD2_170926,PT1830637,BS CHẢ GIÒ,17/09/2026,HOÀN THÀNH ,0 SKU,88,88,88,0,2,"100,0%"
-35,KFM_FROZEN_180926,PT1835454,Em gửi booking hàng đông giao ngày 18/09,18/09/2026,HOÀN THÀNH ,0 SKU,9387,9387,9375,12,101,"99,9%"
-36,KFM_FROZEN_NS0_BS,PT1836248,BS NSO 18/09,18/09/2026,HOÀN THÀNH ,0 SKU,56,56,56,0,4,"100,0%"
-37,KFM_FROZEN_190926,PT1841684,booking hàng đông giao ngày 19/09,19/09/2026,HOÀN THÀNH ,0 SKU,8756,8756,8756,0,72,"100,0%"
-38,KFM_FROZEN_BS_190926,PT1842524,booking hàng đông giao ngày 19/09,19/09/2026,HOÀN THÀNH ,0 SKU,1431,1431,1431,0,6,"100,0%"
-39,KFM_FROZEN_200926,PT1847464,booking hàng đông giao ngày 20/09,20/09/2026,HOÀN THÀNH ,0 SKU,11689,11689,11689,0,84,"100,0%"
-40,KFM_FROZEN_BS_NSO_200926,PT1847911,booking NSO hàng đông giao ngày 20/09,20/09/2026,HOÀN THÀNH ,0 SKU,338,338,338,0,21,"100,0%"
-41,KFM_FROZEN_210926,PT1848061,booking hàng đông giao ngày 21/09,21/09/2026,HOÀN THÀNH ,0 SKU,11898,11898,11898,0,87,"100,0%"
-42,KFM_FROZEN_240926,PT1857959,booking hàng đông giao cho 2 NSO A215 A247 ngày 24/09,24/09/2026,HOÀN THÀNH ,0 SKU,1492,1492,1492,0,72,"100,0%"
-43,KFM_FROZEN_220926,PT1858668,booking hàng đông giao ngày 22/09,22/09/2026,HOÀN THÀNH ,0 SKU,10828,10828,10828,0,95,"100,0%"
-44,KFM_FROZEN_230926,PT1864360,Booking hàng ĐÔNG đi hàng ngày 23.09,23/09/2026,HOÀN THÀNH ,0 SKU,14203,14203,14203,0,107,"100,0%"
-45,KFM_FROZEN_DL_240926,PT1870253,Booking ĐÔNG và ĐÔNG booking đợt 2 NSO đi hàng ngày 24.09,24/09/2026,HOÀN THÀNH ,1 SKU ,15702,15680,15600,80,104,"99,4%"
-46,KFM_FROZEN_250926,PT1875803,Booking ĐÔNG đi hàng ngày 25.09,25/09/2026,HOÀN THÀNH ,1 SKU ,11369,11285,11285,0,98,"99,3%"
-47,KFM_FROZEN_BS_250926,PT1876703,Booking ĐÔNG đi hàng ngày 25.09 - bổ sung,25/09/2026,HOÀN THÀNH ,0 SKU,142,142,142,0,25,"100,0%"
-48,KFM_FROZEN_260926,PT1881689,booking hàng ĐÔNG đi hàng ngày 26.09,26/09/2026,HOÀN THÀNH ,1 SKU,18842,18792,18792,0,105,"99,7%"
-49,KFM_FROZEN_BS_NSO_260926,PT1882705,booking châm hàng đông NSO đi hàng ngày 26.09,26/09/2026,HOÀN THÀNH ,0 SKU ,221,221,221,0,21,"100,0%"
-50,KFM_FROZEN_290926,PT1897483,File boooking hàng ĐÔNG đi hàng ngày 29.09,29/09/2026,HOÀN THÀNH ,0 SKU,19310,19310,19310,0,132,"100,0%"
-51,KFM_FROZEN_300926,PT1902740,booking hàng ĐÔNG đi hàng ngày 30.09,30/09/2026,HOÀN THÀNH ,0 SKU,19208,19208,19208,0,121,"100,0%"
-52,KFM_FROZEN_NSO_021026,PT1902070,booking hàng ĐÔNG NSO đợt 1 đi hàng ngày 02.10,02/10/2026,HOÀN THÀNH ,0 SKU,647,647,647,0,58,"100,0%"
-53,KFM_FROZEN_011026,PT1908222,Booking hàng ĐÔNG đi hàng ngày 01.10,01/10/2026,HOÀN THÀNH ,0 SKU ,13535,13535,13535,0,121,"100,0%"
-54,KFM_FROZEN_BS_011026,PT1908795,Booking hàng ĐÔNG đi hàng ngày 01.10 bổ sung,01/10/2026,HOÀN THÀNH ,0 SKU ,60,60,60,0,1,"100,0%"
-55,KFM_FROZEN_021026,PT1913493,Booking hàng ĐÔNG đi hàng ngày 02.10,02/10/2026,HOÀN THÀNH ,0 SKU ,10695,10695,10694,1,119,"100,0%"
-56,KFM_FROZEN_BS_NSO_A222,PT1912638,booking hàng ĐÔNG NSO đợt 2 đi hàng ngày 02.10,02/10/2026,HOÀN THÀNH ,0 SKU ,47,47,47,0,4,"100,0%"
-57,KFM_FROZEN_BS_021026,PT1914184,Booking hàng ĐÔNG đi hàng ngày 02.10 - Bổ sung,02/10/2026,HOÀN THÀNH ,0 SKU ,610,610,610,0,1,"100,0%"
-58,KFM_FROZEN_031026,PT1918877,Booking hàng ĐÔNG đi hàng ngày 03.10,03/10/2026,HOÀN THÀNH ,0 SKU ,14854,14854,14854,0,115,"100,0%"
-59,KFM_FROZEN_BS_031026,PT1919339,Booking hàng ĐÔNG đi hàng ngày 03.10 - bổ sung,03/10/2026,HOÀN THÀNH ,1 SKU,456,456,454,2,5,"99,6%"
-60,KFM_FROZEN_061026,PT1935371,booking hàng ĐÔNG đi hàng ngày 06.10,06/10/2026,HOÀN THÀNH ,0 SKU ,21321,21321,21321,0,121,"100,0%"
-61,KFM_FROZEN_NSO_081026,PT1935358,booking hàng ĐÔNG NSO đợt 1 đi hàng ngày 08.10,08/10/2026,HOÀN THÀNH ,0 SKU ,1560,1560,1560,0,80,"100,0%"
-62,KFM_FROZEN_071026,PT1940757,Booking hàng ĐÔNG đi hàng ngày 07.10,07/10/2026,HOÀN THÀNH ,0 SKU ,20326,20326,20326,0,124,"100,0%"
-63,KFM_FROZEN_081026,PT1946978,booking hàng ĐÔNG đi hàng ngày 08.10,08/10/2026,HOÀN THÀNH ,0 SKU ,15611,15611,15611,0,122,"100,0%"
-64,KFM_FROZEN_BS_NSO_081026,PT1946389,booking hàng ĐÔNG NSO đợt 2 đi hàng ngày 08.10,08/10/2026,HOÀN THÀNH ,4 SKU ,748,664,664,0,52,"88,8%"
-65,KFM_FROZEN_091026,PT1952290,booking hàng ĐÔNG đi hầng ngày 09.10,09/10/2026,HOÀN THÀNH ,0 SKU,12785,12785,12785,0,117,"100,0%"
-66,KFM_FROZEN_101026,PT1958199,Booking hàng ĐÔNG đi hàng ngày 10.10,10/10/2026,HOÀN THÀNH ,0 SKU ,16781,16781,16781,0,122,"100,0%"
-67,KFM_FROZEN_BS_NSO_101026,PT1959293,"Booking hàng ĐÔNG NSO A246, A258, A259 đợt bổ sung đi hàng ngày 10.10",10/10/2026,HOÀN THÀNH ,0 SKU ,198,198,198,0,20,"100,0%"
-68,KFM_FROZEN_NSO_HN_141026,PT1959202,Booking NSO B001 đợt 1 đi hàng ngày 14.10,14/10/2026,HOÀN THÀNH ,0 SKU ,893,893,893,0,66,"100,0%"
-69,KFM_FROZEN_BS_NSO_HN_141026,PT1959297,Booking NSO B001 đợt 1 đi hàng ngày 14.10 - Bổ sung,14/10/2026,HOÀN THÀNH ,0 SKU ,9967,9967,9967,0,5,"100,0%"
-70,KFM_FROZEN_131026,PT1974488,booking hàng ĐÔNG đi hàng ngày 13.10,13/10/2026,HOÀN THÀNH ,0 SKU ,19501,19501,19501,0,120,"100,0%"
-71,KFM_FROZEN_NSO_A266,PT1974478,booking hàng ĐÔNG NSO A266 đợt 1 đi hàng ngày 15.10,15/10/2026,HOÀN THÀNH ,0 SKU ,790,790,790,0,77,"100,0%"
-72,KFM_FROZEN_HN_141026,PT1974956,Booking NSO B001 đợt 2 đi hàng ngày 17.10 (Lưu kho Hà Nội),14/10/2026,HOÀN THÀNH ,0 SKU,1971,1971,1971,0,70,"100,0%"
+STT,TÊN WAVE ,SỐ PT,LOẠI ĐƠN ,NGÀY ĐI HÀNG ,TRẠNG THÁI ,SHORT,TỔNG LƯỢNG ,LƯỢNG ALLOCATE ĐƯỢC ,LƯỢNG PICK ,SỐ LƯỢNG UNIT RỚT ĐƠN HÀNG ,SỐ LƯỢNG SKU /ĐƠN HÀNG,TỶ LỆ 
+
+1,KFM_FROZEN_NSO_270826,PT1714502,hàng đông NSO đợt 1 đi hàng 27.08,27/08/2026,HOÀN THÀNH ,6 SKU ,732,732,732,0,79,"100,0%"
+
+2,KFM_FROZEN_260826,PT1719215,Hàng ĐÔNG đi hàng ngày 26.08,26/06/2026,HOÀN THÀNH ,11 SKU ,14864,14530,12669,1861,123,"85,2%"
+
+3,KFM_FROZEN_NS0_D1_270826,PT1723591,hàng đông NSO đợt 2 và đông daily đi hàng 27.08,27/08/2026,HOÀN THÀNH ,20 SKU ,19316,18231,14351,3880,124,"74,3%"
+
+4, Wave - KFM_FROZEN_280626,PT1728736,hàng ĐÔNG đi hàng ngày 28.08,28/8/2026,HOÀN THÀNH ,27 SKU ,15150,13424,12208,1216,129,"80,6%"
+
+5,KFM_FROZEN_290826,PT1733543,hàng ĐÔNG đi hàng 29.08,29/08/2026,HOÀN THÀNH ,27 SKU ,15061,13867,12822,1045,124,"85,1%"
+
+6,KFM_FROZEN_CNSO_290826,PT1734211,Booking châm hàng ĐÔNG NSO A232 đi hàng ngày 29.08,29/08/2026,HOÀN THÀNH ,6 SKU ,317,275,233,42,32,"73,5%"
+
+7, KFM_FROZEN_BSNSO_290826,PT1734396,Booking bổ sung NSO A232 hàng ĐÔNG mã short tồn đi hàng 29.08,29/08/2026,HOÀN THÀNH ,0 SKU ,24,24,24,0,5,"100,0%"
+
+8,KFM_FROZEN_300826,PT1738035,Booking hàng ĐÔNG đi hàng ngày 30.08,30/08/2026,HOÀN THÀNH ,23 SKU ,12395,11427,10974,453,124,"88,5%"
+
+9,KFM_FROZEN_310826,PT1741603,hàng ĐÔNG đi hàng ngày 31.08,31/08/2026,HOÀN THÀNH ,24SKU ,8685,7597,6500,1097,118,"74,8%"
+
+10,KFM_FROZEN_BS_310826,PT1742468,bổ sung hàng Đông về hàng ngày 31.08,31/08/2026,HOÀN THÀNH ,26 SKU,1694,1328,1200,128,98,"70,8%"
+
+11,KFM_FROZEN_BS_A232_310826,PT1742671,bổ sung thêm 1 ST mà chia thiếu của Anh Thiện,31/08/2026,HOÀN THÀNH ,8 SKU,246,209,205,4,42,"83,3%"
+
+12,KFM_FROZEN_NSO_040926,PT1749839,hàng ĐÔNG NSO đợt 1 đi hàng ngày 04.09,04/09/2026,HOÀN THÀNH ,3sku,784,760,760,0,81,"96,9%"
+
+13,KFM_FROZEN_020926,PT1749853,DAILY 02.09.2026,02/09/2026,HOÀN THÀNH ,3 SKU,12988,12453,12453,0,125,"95,9%"
+
+14,KFM_FROZEN_030926,PT1754784,DAILY 03.09.2026,03/09/2026,HOÀN THÀNH ,0 SKU,14048,14048,14048,0,122,"100,0%"
+
+15,KFM_FROZEN_040926,PT1759106,DAILY + NSO BS 04.09.26,04/09/2026,HOÀN THÀNH ,0 SKU,11915,11915,11914,1,115,"100,0%"
+
+16,KFM_FROZEN_050926,PT1764778,booking hàng ĐÔNG đi hàng 05.09,05/09/2026,HOÀN THÀNH ,0 SKU ,13778,13778,13778,0,88,"100,0%"
+
+17,KFM_FROZEN_060926,PT1769197,booking hàng ĐÔNG đi hàng 06.09,06/09/2026,HOÀN THÀNH ,4 SKU,11252,11146,11146,0,115,"99,1%"
+
+18,KFM_FROZEN_CNSO_060926,PT1769763,châm NSO,06/09/2026,HOÀN THÀNH ,0 SKU ,146,146,146,0,14,"100,0%"
+
+19,KFM_FROZEN_070926,PT1773623,booking hàng ĐÔNG đi hàng 07.09,07/09/2026,HOÀN THÀNH ,7 SKU,10270,10216,10039,177,111,"97,8%"
+
+20,KFM_FROZEN_080926,PT1778209,booking hàng ĐÔNG đi hàng ngày 08.09,08/09/2026,HOÀN THÀNH ,0 SKU ,15372,15222,15202,20,25,"98,9%"
+
+21,KFM_FROZEN_BS_080926,PT1779129,booking hàng ĐÔNG (mã sắp ngưng) đi hàng ngày 08.09,08/09/2026,HOÀN THÀNH ,0 SKU ,5212,5212,5159,53,12,"99,0%"
+
+22,KFM_FROZEN_NSO_A250,PT1783212,hàng ĐÔNG NSO đợt 1 đi hàng ngày 11.09,11/09/2026,HOÀN THÀNH ,0 SKU ,739,739,731,8,71,"98,9%"
+
+23,KFM_FROZEN_090926,PT1783893,hàng ĐÔNG đi hàng ngày 09.09,09/09/2026,HOÀN THÀNH ,0 SKU ,10366,10366,10366,0,100,"100,0%"
+
+24,KFM_FROZEN_100926,PT1789442,hàng ĐÔNG đi hàng ngày 10.09,10/09/2026,HOÀN THÀNH ,0 SKU ,11876,11876,11876,0,112,"100,0%"
+
+25,KFM_FROZEN_DL_NSO_110926,PT1795286,hàng đông NSO đợt 2 và đông daily đi hàng 11.09,11/09/2026,HOÀN THÀNH ,0 SKU ,12747,12571,12571,0,99,"98,6%"
+
+26,KFM_FROZEN_120926,PT1801223,hàng ĐÔNG đi hàng ngày 12.09,12/09/2026,HOÀN THÀNH ,0 SKU ,13355,13355,13257,98,111,"99,3%"
+
+27,KFM_FROZEN_130926,PT1807225,hàng ĐÔNG đi hàng ngày 13.09,13/09/2026,HOÀN THÀNH ,2 SKU,12635,12635,12605,30,81,"99,8%"
+
+28,KFM_FROZEN_CA250,PT1808173,châm NSO,13/09/2026,HOÀN THÀNH ,0 SKU,106,106,106,0,11,"100,0%"
+
+29,KFM_FROZEN_140926,PT1811728,hàng ĐÔNG đi hàng ngày 14.09,14/09/2026,HOÀN THÀNH ,1 SKU,10852,10782,10782,0,81,"99,4%"
+
+30,KFM_FROZEN_160926,PT1823756,hàng ĐÔNG đi hàng ngày 16.09,16/09/2026,HOÀN THÀNH ,0 sku,10602,10602,10602,0,99,"100,0%"
+
+31,KFM_FROZEN_NSO_180926,PT1823803,ĐƠN NSO,18/09/2026,HOÀN THÀNH ,9 sku,2475,2285,2279,6,87,"92,1%"
+
+32,KFM_FROZEN_170926,PT1828684,Em gửi booking hàng đông giao ngày 17/09,17/09/2026,HOÀN THÀNH ,0 sku,11700,11700,11684,16,101,"99,9%"
+
+33,KFM_FROZEN_BS_170926,PT1829883,BS KEM,17/09/2026,HOÀN THÀNH ,0 SKU,16,16,16,0,1,"100,0%"
+
+34,KFM_FROZEN_BSD2_170926,PT1830637,BS CHẢ GIÒ,17/09/2026,HOÀN THÀNH ,0 SKU,88,88,88,0,2,"100,0%"
+
+35,KFM_FROZEN_180926,PT1835454,Em gửi booking hàng đông giao ngày 18/09,18/09/2026,HOÀN THÀNH ,0 SKU,9387,9387,9375,12,101,"99,9%"
+
+36,KFM_FROZEN_NS0_BS,PT1836248,BS NSO 18/09,18/09/2026,HOÀN THÀNH ,0 SKU,56,56,56,0,4,"100,0%"
+
+37,KFM_FROZEN_190926,PT1841684,booking hàng đông giao ngày 19/09,19/09/2026,HOÀN THÀNH ,0 SKU,8756,8756,8756,0,72,"100,0%"
+
+38,KFM_FROZEN_BS_190926,PT1842524,booking hàng đông giao ngày 19/09,19/09/2026,HOÀN THÀNH ,0 SKU,1431,1431,1431,0,6,"100,0%"
+
+39,KFM_FROZEN_200926,PT1847464,booking hàng đông giao ngày 20/09,20/09/2026,HOÀN THÀNH ,0 SKU,11689,11689,11689,0,84,"100,0%"
+
+40,KFM_FROZEN_BS_NSO_200926,PT1847911,booking NSO hàng đông giao ngày 20/09,20/09/2026,HOÀN THÀNH ,0 SKU,338,338,338,0,21,"100,0%"
+
+41,KFM_FROZEN_210926,PT1848061,booking hàng đông giao ngày 21/09,21/09/2026,HOÀN THÀNH ,0 SKU,11898,11898,11898,0,87,"100,0%"
+
+42,KFM_FROZEN_240926,PT1857959,booking hàng đông giao cho 2 NSO A215 A247 ngày 24/09,24/09/2026,HOÀN THÀNH ,0 SKU,1492,1492,1492,0,72,"100,0%"
+
+43,KFM_FROZEN_220926,PT1858668,booking hàng đông giao ngày 22/09,22/09/2026,HOÀN THÀNH ,0 SKU,10828,10828,10828,0,95,"100,0%"
+
+44,KFM_FROZEN_230926,PT1864360,Booking hàng ĐÔNG đi hàng ngày 23.09,23/09/2026,HOÀN THÀNH ,0 SKU,14203,14203,14203,0,107,"100,0%"
+
+45,KFM_FROZEN_DL_240926,PT1870253,Booking ĐÔNG và ĐÔNG booking đợt 2 NSO đi hàng ngày 24.09,24/09/2026,HOÀN THÀNH ,1 SKU ,15702,15680,15600,80,104,"99,4%"
+
+46,KFM_FROZEN_250926,PT1875803,Booking ĐÔNG đi hàng ngày 25.09,25/09/2026,HOÀN THÀNH ,1 SKU ,11369,11285,11285,0,98,"99,3%"
+
+47,KFM_FROZEN_BS_250926,PT1876703,Booking ĐÔNG đi hàng ngày 25.09 - bổ sung,25/09/2026,HOÀN THÀNH ,0 SKU,142,142,142,0,25,"100,0%"
+
+48,KFM_FROZEN_260926,PT1881689,booking hàng ĐÔNG đi hàng ngày 26.09,26/09/2026,HOÀN THÀNH ,1 SKU,18842,18792,18792,0,105,"99,7%"
+
+49,KFM_FROZEN_BS_NSO_260926,PT1882705,booking châm hàng đông NSO đi hàng ngày 26.09,26/09/2026,HOÀN THÀNH ,0 SKU ,221,221,221,0,21,"100,0%"
+
+50,KFM_FROZEN_290926,PT1897483,File boooking hàng ĐÔNG đi hàng ngày 29.09,29/09/2026,HOÀN THÀNH ,0 SKU,19310,19310,19310,0,132,"100,0%"
+
+51,KFM_FROZEN_300926,PT1902740,booking hàng ĐÔNG đi hàng ngày 30.09,30/09/2026,HOÀN THÀNH ,0 SKU,19208,19208,19208,0,121,"100,0%"
+
+52,KFM_FROZEN_NSO_021026,PT1902070,booking hàng ĐÔNG NSO đợt 1 đi hàng ngày 02.10,02/10/2026,HOÀN THÀNH ,0 SKU,647,647,647,0,58,"100,0%"
+
+53,KFM_FROZEN_011026,PT1908222,Booking hàng ĐÔNG đi hàng ngày 01.10,01/10/2026,HOÀN THÀNH ,0 SKU ,13535,13535,13535,0,121,"100,0%"
+
+54,KFM_FROZEN_BS_011026,PT1908795,Booking hàng ĐÔNG đi hàng ngày 01.10 bổ sung,01/10/2026,HOÀN THÀNH ,0 SKU ,60,60,60,0,1,"100,0%"
+
+55,KFM_FROZEN_021026,PT1913493,Booking hàng ĐÔNG đi hàng ngày 02.10,02/10/2026,HOÀN THÀNH ,0 SKU ,10695,10695,10694,1,119,"100,0%"
+
+56,KFM_FROZEN_BS_NSO_A222,PT1912638,booking hàng ĐÔNG NSO đợt 2 đi hàng ngày 02.10,02/10/2026,HOÀN THÀNH ,0 SKU ,47,47,47,0,4,"100,0%"
+
+57,KFM_FROZEN_BS_021026,PT1914184,Booking hàng ĐÔNG đi hàng ngày 02.10 - Bổ sung,02/10/2026,HOÀN THÀNH ,0 SKU ,610,610,610,0,1,"100,0%"
+
+58,KFM_FROZEN_031026,PT1918877,Booking hàng ĐÔNG đi hàng ngày 03.10,03/10/2026,HOÀN THÀNH ,0 SKU ,14854,14854,14854,0,115,"100,0%"
+
+59,KFM_FROZEN_BS_031026,PT1919339,Booking hàng ĐÔNG đi hàng ngày 03.10 - bổ sung,03/10/2026,HOÀN THÀNH ,1 SKU,456,456,454,2,5,"99,6%"
+
+60,KFM_FROZEN_061026,PT1935371,booking hàng ĐÔNG đi hàng ngày 06.10,06/10/2026,HOÀN THÀNH ,0 SKU ,21321,21321,21321,0,121,"100,0%"
+
+61,KFM_FROZEN_NSO_081026,PT1935358,booking hàng ĐÔNG NSO đợt 1 đi hàng ngày 08.10,08/10/2026,HOÀN THÀNH ,0 SKU ,1560,1560,1560,0,80,"100,0%"
+
+62,KFM_FROZEN_071026,PT1940757,Booking hàng ĐÔNG đi hàng ngày 07.10,07/10/2026,HOÀN THÀNH ,0 SKU ,20326,20326,20326,0,124,"100,0%"
+
+63,KFM_FROZEN_081026,PT1946978,booking hàng ĐÔNG đi hàng ngày 08.10,08/10/2026,HOÀN THÀNH ,0 SKU ,15611,15611,15611,0,122,"100,0%"
+
+64,KFM_FROZEN_BS_NSO_081026,PT1946389,booking hàng ĐÔNG NSO đợt 2 đi hàng ngày 08.10,08/10/2026,HOÀN THÀNH ,4 SKU ,748,664,664,0,52,"88,8%"
+
+65,KFM_FROZEN_091026,PT1952290,booking hàng ĐÔNG đi hầng ngày 09.10,09/10/2026,HOÀN THÀNH ,0 SKU,12785,12785,12785,0,117,"100,0%"
+
+66,KFM_FROZEN_101026,PT1958199,Booking hàng ĐÔNG đi hàng ngày 10.10,10/10/2026,HOÀN THÀNH ,0 SKU ,16781,16781,16781,0,122,"100,0%"
+
+67,KFM_FROZEN_BS_NSO_101026,PT1959293,"Booking hàng ĐÔNG NSO A246, A258, A259 đợt bổ sung đi hàng ngày 10.10",10/10/2026,HOÀN THÀNH ,0 SKU ,198,198,198,0,20,"100,0%"
+
+68,KFM_FROZEN_NSO_HN_141026,PT1959202,Booking NSO B001 đợt 1 đi hàng ngày 14.10,14/10/2026,HOÀN THÀNH ,0 SKU ,893,893,893,0,66,"100,0%"
+
+69,KFM_FROZEN_BS_NSO_HN_141026,PT1959297,Booking NSO B001 đợt 1 đi hàng ngày 14.10 - Bổ sung,14/10/2026,HOÀN THÀNH ,0 SKU ,9967,9967,9967,0,5,"100,0%"
+
+70,KFM_FROZEN_131026,PT1974488,booking hàng ĐÔNG đi hàng ngày 13.10,13/10/2026,HOÀN THÀNH ,0 SKU ,19501,19501,19501,0,120,"100,0%"
+
+71,KFM_FROZEN_NSO_A266,PT1974478,booking hàng ĐÔNG NSO A266 đợt 1 đi hàng ngày 15.10,15/10/2026,HOÀN THÀNH ,0 SKU ,790,790,790,0,77,"100,0%"
+
+72,KFM_FROZEN_HN_141026,PT1974956,Booking NSO B001 đợt 2 đi hàng ngày 17.10 (Lưu kho Hà Nội),14/10/2026,HOÀN THÀNH ,0 SKU,1971,1971,1971,0,70,"100,0%"
+
 73,KFM_FROZEN_141026,PT1979901,booking hàng ĐÔNG đi hàng ngày 14.10,14/10/2026,CHƯA PICK ,0 SKU ,18546,18546,,18546,121,"0,0%"
 `;
 
@@ -2673,8 +2746,61 @@ STT,TÊN WAVE ,SỐ PT,LOẠI ĐƠN ,NGÀY ĐI HÀNG ,TRẠNG THÁI ,SHORT,TỔN
         ['Số Wave phát sinh rớt hàng / short', filteredOrders.filter(o => o.shortSkuCount > 0 || o.dropped < 0).length, 'Wave'],
         ['Số Wave có mã Booking vượt tồn kho', filteredOrders.filter(o => o.reconcile && o.reconcile.overStockCount > 0).length, 'Wave']
       ];
+      // Thêm Danh sách chi tiết các Wave vào ngay phía dưới Sheet 1 theo yêu cầu
+      summaryAoa.push([]);
+      summaryAoa.push(['--- DANH SÁCH CHI TIẾT CÁC ĐỢT SÓNG (WAVE) XUẤT KHO ---']);
+      summaryAoa.push([
+        'STT', 'Tên Wave', 'Số PT', 'Loại Đơn', 'Ngày Đi Hàng', 
+        'Trạng Thái', 'Short SKU', 'SKU / Đơn', 'Tổng Lượng Y/C', 
+        'Lượng Allocate', 'Lượng Thực Pick', 'Unit Rớt Đơn', 
+        'Tỷ Lệ Đáp Ứng', 'Tình Trạng Tồn Kho', 'Số SKU Vượt Tồn'
+      ]);
+
+      const sortedListForSummary = [...filteredOrders].sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime() || a.stt - b.stt);
+      sortedListForSummary.forEach(o => {
+        const reconText = o.reconcile 
+          ? (o.reconcile.overStockCount > 0 ? `Vượt tồn (${o.reconcile.overStockCount} SKU)` : 'Đủ tồn kho')
+          : 'Chưa đối chiếu';
+        const overSkuNum = o.reconcile ? o.reconcile.overStockCount : 0;
+
+        summaryAoa.push([
+          o.stt,
+          o.wave,
+          o.pt,
+          o.type,
+          o.date,
+          o.status,
+          o.shortText || '',
+          o.skuPerOrder,
+          o.total,
+          o.allocated,
+          o.picked,
+          Math.abs(o.dropped),
+          o.rateFormatted,
+          reconText,
+          overSkuNum
+        ]);
+      });
+
       const wsSummary = XLSX.utils.aoa_to_sheet(summaryAoa);
-      XLSX.utils.book_append_sheet(wb, wsSummary, 'Tổng Quan KPI');
+      wsSummary['!cols'] = [
+        { wch: 6 },
+        { wch: 28 },
+        { wch: 14 },
+        { wch: 32 },
+        { wch: 14 },
+        { wch: 14 },
+        { wch: 12 },
+        { wch: 12 },
+        { wch: 15 },
+        { wch: 15 },
+        { wch: 15 },
+        { wch: 14 },
+        { wch: 14 },
+        { wch: 22 },
+        { wch: 16 }
+      ];
+      XLSX.utils.book_append_sheet(wb, wsSummary, 'Tổng Quan & Chi Tiết Wave');
 
       // Sheet 2: Chi Tiết Các Wave
       const ordersHeader = [
@@ -2995,21 +3121,10 @@ STT,TÊN WAVE ,SỐ PT,LOẠI ĐƠN ,NGÀY ĐI HÀNG ,TRẠNG THÁI ,SHORT,TỔN
         }
         renderFiles();
 
-        // Tự động nhận diện Tên Wave từ file vừa thả
-        const detectedWave = autoDetectWave(state.files);
+        // KHÔNG TỰ ĐỘNG THAY ĐỔI WAVE: Giữ nguyên Wave người dùng đã chủ động chọn
+        // Tuyệt đối không tự nhảy Wave làm sai lệch dữ liệu
         const badgeEl = document.getElementById('t1AutoDetectBadge');
-        const textEl = document.getElementById('t1AutoDetectText');
-        const selectEl = document.getElementById('t1TargetWaveSelect');
-
-        if (detectedWave) {
-          if (selectEl) selectEl.value = detectedWave.wave;
-          if (badgeEl && textEl) {
-            textEl.innerHTML = `Đã tự động nhận diện Wave: <b class="text-white">${detectedWave.wave}</b> (${detectedWave.pt} - Ngày ${detectedWave.date})`;
-            badgeEl.classList.remove('hidden');
-          }
-        } else {
-          if (badgeEl) badgeEl.classList.add('hidden');
-        }
+        if (badgeEl) badgeEl.classList.add('hidden');
       }
 
       function renderFiles() {
