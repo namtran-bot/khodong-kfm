@@ -2120,11 +2120,13 @@ STT,TÊN WAVE ,SỐ PT,LOẠI ĐƠN ,NGÀY ĐI HÀNG ,TRẠNG THÁI ,SHORT,TỔN
           throw new Error('Dữ liệu trả về không hợp lệ');
         }
         rawOrders = parseCSV(text);
+        window.rawOrders = rawOrders;
         if (typeof InOutModule !== 'undefined') InOutModule.render();
         syncStatus.innerHTML = '<span class="text-emerald-400 font-semibold">Google Sheets Live</span>';
       } catch (err) {
         console.warn('Sử dụng dữ liệu kho đông mới nhất.', err);
         rawOrders = parseCSV(INITIAL_CSV_DATA);
+        window.rawOrders = rawOrders;
         syncStatus.innerHTML = '<span class="text-emerald-400 font-semibold" title="Đã nạp đầy đủ ' + rawOrders.length + ' Wave">🟢 Dữ liệu Wave (' + rawOrders.length + ' Wave)</span>';
       } finally {
         // Tải toàn bộ dữ liệu đối chiếu từ Cloud về gán vào rawOrders
@@ -6116,22 +6118,29 @@ PR1002705371,PO1002705371,Phiếu tạm,FZA50101,FZA50101 _ Sóng Thần _ Lưu 
     }
   }
 
+  function getRawOrdersList() {
+    if (typeof rawOrders !== 'undefined' && Array.isArray(rawOrders) && rawOrders.length > 0) return rawOrders;
+    if (window.rawOrders && Array.isArray(window.rawOrders) && window.rawOrders.length > 0) return window.rawOrders;
+    return [];
+  }
+
   // QUERY OUTBOUND VOLUME FROM WEB DONG (GOOGLE SHEET 'rawOrders') BY DATE
   function getOutboundForDate(dateStr, region) {
-    if (!window.rawOrders || !Array.isArray(window.rawOrders)) {
+    const allOrders = getRawOrdersList();
+    if (!allOrders || allOrders.length === 0) {
       return { totalDemand: 0, totalAllocate: 0, totalPick: 0, waveCount: 0, waves: [], tons: 0 };
     }
 
-    const waves = window.rawOrders.filter(w => {
-      const wDate = extractDateOnly(w.date || w['NGAY DI HANG']);
+    const waves = allOrders.filter(w => {
+      const wDate = extractDateOnly(w.date || w['NGÀY ĐI HÀNG'] || w['NGAY DI HANG']);
       return wDate === dateStr;
     });
 
     let demand = 0, allocate = 0, pick = 0;
     waves.forEach(w => {
-      demand += (w.demand || 0);
-      allocate += (w.allocate || 0);
-      pick += (w.pick || 0);
+      demand += (w.total !== undefined ? w.total : (w.demand || 0));
+      allocate += (w.allocated !== undefined ? w.allocated : (w.allocate || 0));
+      pick += (w.picked !== undefined ? w.picked : (w.pick || 0));
     });
 
     const tons = Math.round((pick * (fcWeekData.kgPerItem || 0.291) / 1000) * 1000) / 1000;
@@ -6706,16 +6715,17 @@ PR1002705371,PO1002705371,Phiếu tạm,FZA50101,FZA50101 _ Sóng Thần _ Lưu 
       }
     });
 
-    if (window.rawOrders && Array.isArray(window.rawOrders)) {
-      window.rawOrders.forEach(w => {
-        const d = extractDateOnly(w.date || w['NGAY DI HANG']);
+    const allOrdersBalance = getRawOrdersList();
+    if (allOrdersBalance && Array.isArray(allOrdersBalance)) {
+      allOrdersBalance.forEach(w => {
+        const d = extractDateOnly(w.date || w['NGÀY ĐI HÀNG'] || w['NGAY DI HANG']);
         if (!d) return;
         if (!dateMap.has(d)) {
           dateMap.set(d, { date: d, inPr: new Set(), inPoQty: 0, inRecQty: 0, inKg: 0, outDemand: 0, outPick: 0, waveCount: 0 });
         }
         const e = dateMap.get(d);
-        e.outDemand += (w.demand || 0);
-        e.outPick += (w.pick || 0);
+        e.outDemand += (w.total !== undefined ? w.total : (w.demand || 0));
+        e.outPick += (w.picked !== undefined ? w.picked : (w.pick || 0));
         e.waveCount++;
       });
     }
@@ -6738,10 +6748,10 @@ PR1002705371,PO1002705371,Phiếu tạm,FZA50101,FZA50101 _ Sóng Thần _ Lưu 
       }
     });
 
-    if (window.rawOrders && Array.isArray(window.rawOrders)) {
-      window.rawOrders.forEach(w => {
-        totalOutPick += (w.pick || 0);
-        totalOutDemand += (w.demand || 0);
+    if (allOrdersBalance && Array.isArray(allOrdersBalance)) {
+      allOrdersBalance.forEach(w => {
+        totalOutPick += (w.picked !== undefined ? w.picked : (w.pick || 0));
+        totalOutDemand += (w.total !== undefined ? w.total : (w.demand || 0));
         totalOutWaves++;
       });
     }
@@ -7050,19 +7060,20 @@ PR1002705371,PO1002705371,Phiếu tạm,FZA50101,FZA50101 _ Sóng Thần _ Lưu 
     XLSX.utils.book_append_sheet(wb, ws2, 'Phieu_Nhap_Hang');
 
     // Sheet 3: Danh sách Xuất Web Đông
-    if (window.rawOrders && Array.isArray(window.rawOrders)) {
-      const outData = window.rawOrders.map(w => ({
+    const allOrdersExcel = getRawOrdersList();
+    if (allOrdersExcel && Array.isArray(allOrdersExcel)) {
+      const outData = allOrdersExcel.map(w => ({
         'STT': w.stt,
         'Tên Wave': w.wave,
         'Số PT': w.pt,
         'Loại Đơn': w.type,
         'Ngày Đi Hàng': w.date,
         'Trạng Thái': w.status,
-        'Tổng Lượng Y/C': w.demand,
-        'Allocate': w.allocate,
-        'Lượng Pick': w.pick,
-        'Rớt Đơn': w.shortUnit,
-        'Tỷ Lệ %': w.rate
+        'Tổng Lượng Y/C': w.total !== undefined ? w.total : (w.demand || 0),
+        'Allocate': w.allocated !== undefined ? w.allocated : (w.allocate || 0),
+        'Lượng Pick': w.picked !== undefined ? w.picked : (w.pick || 0),
+        'Rớt Đơn': w.dropped !== undefined ? w.dropped : (w.shortUnit || 0),
+        'Tỷ Lệ %': w.diffRatio || w.rate
       }));
       const ws3 = XLSX.utils.json_to_sheet(outData);
       XLSX.utils.book_append_sheet(wb, ws3, 'Xuat_Web_Dong');
